@@ -6,3 +6,4 @@
 - Siga as melhores práticas de segurança de software.
 - Interações com bancos de dados sempre com transactions em casos onde o erro é inaceitável, principalmente os envolvendo pagamentos e devoluções.
 - Nunca colocar informações críticas e privadas sobre o servidor dentro do código, sempre na variável de ambiente ".env".
+- Documentação em PT-BR.

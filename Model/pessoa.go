@@ -17,13 +17,12 @@ type Pessoa struct {
 	CPF   string `gorm:"type:text;not null;uniqueIndex" json:"cpf"`
 	Idade int16  `gorm:"type:smallint" json:"idade"`
 
-	Celular string `gorm:"type:text" json:"celular"`
-	Igreja  string `gorm:"type:text" json:"igreja"`
+	Igreja string `gorm:"type:text" json:"igreja"`
 
 	PapelIgreja PapelIgreja `gorm:"type:text" json:"papel_igreja"`
 	EstadoCivil EstadoCivil `gorm:"type:text" json:"estado_civil"`
 
-	Email string `gorm:"type:text" json:"email"`
+	Email string `gorm:"type:text;not null" json:"email"`
 	Sexo  Sexo   `gorm:"type:text" json:"sexo"`
 
 	Cidade   string   `gorm:"type:text" json:"cidade"`
