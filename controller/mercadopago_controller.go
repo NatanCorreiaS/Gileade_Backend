@@ -9,6 +9,7 @@ import (
 	"time"
 
 	model "gileade/gileade_backend/Model"
+	"gileade/gileade_backend/audit"
 	"gileade/gileade_backend/gateway"
 	"gileade/gileade_backend/repository"
 
@@ -70,6 +71,10 @@ func (c *MercadoPagoController) RegisterRoutes(rg *gin.RouterGroup) {
 func (c *MercadoPagoController) CreateCheckoutPro(ctx *gin.Context) {
 	var req CheckoutProRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
+		audit.GetLogger().LogEvent("checkout_pro_criar", false, map[string]any{
+			"usuario_id": req.UsuarioID,
+			"ticket_id":  req.TicketID,
+		}, err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "payload inválido"})
 		return
 	}
@@ -77,11 +82,20 @@ func (c *MercadoPagoController) CreateCheckoutPro(ctx *gin.Context) {
 	// Garante que usuário e ticket existem.
 	pessoa, err := c.pRepo.GetByID(ctx, req.UsuarioID)
 	if err != nil {
+		audit.GetLogger().LogEvent("checkout_pro_criar", false, map[string]any{
+			"usuario_id": req.UsuarioID,
+			"ticket_id":  req.TicketID,
+		}, err)
 		ctx.JSON(http.StatusNotFound, gin.H{"erro": "usuário não encontrado"})
 		return
 	}
 	ticket, err := c.tRepo.GetByID(ctx, req.TicketID)
 	if err != nil {
+		audit.GetLogger().LogEvent("checkout_pro_criar", false, map[string]any{
+			"usuario_id": pessoa.ID,
+			"ticket_id":  req.TicketID,
+			"cpf":        pessoa.CPF,
+		}, err)
 		ctx.JSON(http.StatusNotFound, gin.H{"erro": "ticket não encontrado"})
 		return
 	}
@@ -93,6 +107,11 @@ func (c *MercadoPagoController) CreateCheckoutPro(ctx *gin.Context) {
 		Status:    model.TicketsStatusPendente,
 	}
 	if err := c.tuRepo.Create(ctx, &tu); err != nil {
+		audit.GetLogger().LogEvent("checkout_pro_criar", false, map[string]any{
+			"usuario_id": pessoa.ID,
+			"ticket_id":  ticket.ID,
+			"cpf":        pessoa.CPF,
+		}, err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao criar ticket do usuário"})
 		return
 	}
@@ -103,6 +122,12 @@ func (c *MercadoPagoController) CreateCheckoutPro(ctx *gin.Context) {
 	}
 	if notificationURL == "" {
 		_ = c.tuRepo.Delete(ctx, tu.ID)
+		audit.GetLogger().LogEvent("checkout_pro_criar", false, map[string]any{
+			"ticket_usuario_id": tu.ID,
+			"usuario_id":        pessoa.ID,
+			"ticket_id":         ticket.ID,
+			"cpf":               pessoa.CPF,
+		}, fmt.Errorf("notification_url obrigatório"))
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "notification_url obrigatório"})
 		return
 	}
@@ -138,9 +163,23 @@ func (c *MercadoPagoController) CreateCheckoutPro(ctx *gin.Context) {
 	prefResp, err := c.gw.CreateCheckoutPro(ctx, prefReq)
 	if err != nil {
 		_ = c.tuRepo.Delete(ctx, tu.ID)
+		audit.GetLogger().LogEvent("checkout_pro_criar", false, map[string]any{
+			"ticket_usuario_id": tu.ID,
+			"usuario_id":        pessoa.ID,
+			"ticket_id":         ticket.ID,
+			"cpf":               pessoa.CPF,
+		}, err)
 		ctx.JSON(http.StatusBadGateway, gin.H{"erro": "falha ao criar preferência no Mercado Pago"})
 		return
 	}
+
+	audit.GetLogger().LogEvent("checkout_pro_criar", true, map[string]any{
+		"ticket_usuario_id": tu.ID,
+		"usuario_id":        pessoa.ID,
+		"ticket_id":         ticket.ID,
+		"cpf":               pessoa.CPF,
+		"preference_id":     prefResp.ID,
+	}, nil)
 
 	ctx.JSON(http.StatusOK, CheckoutProResponse{
 		PreferenceID:    prefResp.ID,
@@ -163,12 +202,16 @@ func (c *MercadoPagoController) HandleWebhook(ctx *gin.Context) {
 	}
 
 	if paymentIDStr == "" {
+		audit.GetLogger().LogEvent("pagamento_webhook", false, nil, fmt.Errorf("payment id ausente"))
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "payment id ausente"})
 		return
 	}
 
 	paymentID, err := strconv.Atoi(paymentIDStr)
 	if err != nil {
+		audit.GetLogger().LogEvent("pagamento_webhook", false, map[string]any{
+			"payment_id": paymentIDStr,
+		}, err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "payment id inválido"})
 		return
 	}
@@ -176,18 +219,38 @@ func (c *MercadoPagoController) HandleWebhook(ctx *gin.Context) {
 	// Busca detalhes do pagamento para validar status e referência.
 	payResp, err := c.gw.GetPayment(ctx, paymentID)
 	if err != nil {
+		audit.GetLogger().LogEvent("pagamento_webhook", false, map[string]any{
+			"payment_id": paymentID,
+		}, err)
 		ctx.JSON(http.StatusBadGateway, gin.H{"erro": "falha ao consultar pagamento"})
 		return
 	}
 
 	if payResp.Status != "approved" {
+		audit.GetLogger().LogEvent("pagamento_webhook", false, map[string]any{
+			"payment_id": paymentID,
+			"status":     payResp.Status,
+		}, fmt.Errorf("status=%s", payResp.Status))
 		ctx.JSON(http.StatusOK, gin.H{"status": payResp.Status})
 		return
 	}
 
 	tuID, err := strconv.ParseUint(payResp.ExternalReference, 10, 64)
 	if err != nil {
+		audit.GetLogger().LogEvent("pagamento_webhook", false, map[string]any{
+			"payment_id": paymentID,
+		}, err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "external_reference inválida"})
+		return
+	}
+
+	tu, tuErr := c.tuRepo.GetByID(ctx, tuID)
+	if tuErr != nil {
+		audit.GetLogger().LogEvent("pagamento_webhook", false, map[string]any{
+			"payment_id":        paymentID,
+			"ticket_usuario_id": tuID,
+		}, tuErr)
+		ctx.JSON(http.StatusNotFound, gin.H{"erro": "ticket do usuario não encontrado"})
 		return
 	}
 
@@ -206,13 +269,36 @@ func (c *MercadoPagoController) HandleWebhook(ctx *gin.Context) {
 
 	if err := c.payRepo.CreateAndMarkTicketPago(ctx, &pagamento); err != nil {
 		if isUniqueViolation(err) {
+			audit.GetLogger().LogEvent("pagamento_webhook", true, map[string]any{
+				"payment_id":        paymentID,
+				"ticket_usuario_id": tu.ID,
+				"usuario_id":        tu.UsuarioID,
+				"ticket_id":         tu.TicketID,
+				"cpf":               tu.Usuario.CPF,
+				"status":            "duplicado",
+			}, nil)
 			ctx.JSON(http.StatusOK, gin.H{"status": "duplicado"})
 			return
 		}
+		audit.GetLogger().LogEvent("pagamento_webhook", false, map[string]any{
+			"payment_id":        paymentID,
+			"ticket_usuario_id": tu.ID,
+			"usuario_id":        tu.UsuarioID,
+			"ticket_id":         tu.TicketID,
+			"cpf":               tu.Usuario.CPF,
+		}, err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao registrar pagamento"})
 		return
 	}
 
+	audit.GetLogger().LogEvent("pagamento_webhook", true, map[string]any{
+		"payment_id":        paymentID,
+		"ticket_usuario_id": tu.ID,
+		"usuario_id":        tu.UsuarioID,
+		"ticket_id":         tu.TicketID,
+		"cpf":               tu.Usuario.CPF,
+		"status":            "ok",
+	}, nil)
 	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
 

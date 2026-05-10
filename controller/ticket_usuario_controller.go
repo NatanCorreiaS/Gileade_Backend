@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	model "gileade/gileade_backend/Model"
+	"gileade/gileade_backend/audit"
 	"gileade/gileade_backend/repository"
 
 	"github.com/gin-gonic/gin"
@@ -11,11 +12,15 @@ import (
 )
 
 type TicketUsuarioController struct {
-	repo *repository.TicketUsuarioRepository
+	repo  *repository.TicketUsuarioRepository
+	pRepo *repository.PessoaRepository
 }
 
 func NewTicketUsuarioController(db *gorm.DB) *TicketUsuarioController {
-	return &TicketUsuarioController{repo: repository.NewTicketUsuarioRepository(db)}
+	return &TicketUsuarioController{
+		repo:  repository.NewTicketUsuarioRepository(db),
+		pRepo: repository.NewPessoaRepository(db),
+	}
 }
 
 type TicketUsuarioCreateRequest struct {
@@ -46,7 +51,21 @@ func (c *TicketUsuarioController) RegisterRoutes(rg *gin.RouterGroup) {
 func (c *TicketUsuarioController) Create(ctx *gin.Context) {
 	var req TicketUsuarioCreateRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
+		audit.GetLogger().LogEvent("ticket_usuario_criar", false, map[string]any{
+			"usuario_id": req.UsuarioID,
+			"ticket_id":  req.TicketID,
+		}, err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "payload invalido"})
+		return
+	}
+
+	pessoa, err := c.pRepo.GetByID(ctx, req.UsuarioID)
+	if err != nil {
+		audit.GetLogger().LogEvent("ticket_usuario_criar", false, map[string]any{
+			"usuario_id": req.UsuarioID,
+			"ticket_id":  req.TicketID,
+		}, err)
+		ctx.JSON(http.StatusNotFound, gin.H{"erro": "usuario nao encontrado"})
 		return
 	}
 
@@ -61,9 +80,21 @@ func (c *TicketUsuarioController) Create(ctx *gin.Context) {
 		Status:    status,
 	}
 	if err := c.repo.Create(ctx, &tu); err != nil {
+		audit.GetLogger().LogEvent("ticket_usuario_criar", false, map[string]any{
+			"usuario_id": pessoa.ID,
+			"ticket_id":  req.TicketID,
+			"cpf":        pessoa.CPF,
+		}, err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao criar"})
 		return
 	}
+
+	audit.GetLogger().LogEvent("ticket_usuario_criar", true, map[string]any{
+		"ticket_usuario_id": tu.ID,
+		"usuario_id":        pessoa.ID,
+		"ticket_id":         tu.TicketID,
+		"cpf":               pessoa.CPF,
+	}, nil)
 
 	ctx.JSON(http.StatusCreated, toTicketUsuarioResponse(tu))
 }
@@ -76,9 +107,19 @@ func (c *TicketUsuarioController) GetByID(ctx *gin.Context) {
 
 	tu, err := c.repo.GetByID(ctx, id)
 	if err != nil {
+		audit.GetLogger().LogEvent("ticket_usuario_buscar", false, map[string]any{
+			"ticket_usuario_id": id,
+		}, err)
 		ctx.JSON(http.StatusNotFound, gin.H{"erro": "registro nao encontrado"})
 		return
 	}
+
+	audit.GetLogger().LogEvent("ticket_usuario_buscar", true, map[string]any{
+		"ticket_usuario_id": tu.ID,
+		"usuario_id":        tu.UsuarioID,
+		"ticket_id":         tu.TicketID,
+		"cpf":               tu.Usuario.CPF,
+	}, nil)
 
 	ctx.JSON(http.StatusOK, toTicketUsuarioResponse(tu))
 }
@@ -114,14 +155,41 @@ func (c *TicketUsuarioController) UpdateStatus(ctx *gin.Context) {
 
 	var req TicketUsuarioStatusRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
+		audit.GetLogger().LogEvent("ticket_usuario_status", false, map[string]any{
+			"ticket_usuario_id": id,
+		}, err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "payload invalido"})
 		return
 	}
 
+	tu, err := c.repo.GetByID(ctx, id)
+	if err != nil {
+		audit.GetLogger().LogEvent("ticket_usuario_status", false, map[string]any{
+			"ticket_usuario_id": id,
+		}, err)
+		ctx.JSON(http.StatusNotFound, gin.H{"erro": "registro nao encontrado"})
+		return
+	}
+
 	if err := c.repo.UpdateStatus(ctx, id, req.Status); err != nil {
+		audit.GetLogger().LogEvent("ticket_usuario_status", false, map[string]any{
+			"ticket_usuario_id": tu.ID,
+			"usuario_id":        tu.UsuarioID,
+			"ticket_id":         tu.TicketID,
+			"status":            req.Status,
+			"cpf":               tu.Usuario.CPF,
+		}, err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao atualizar"})
 		return
 	}
+
+	audit.GetLogger().LogEvent("ticket_usuario_status", true, map[string]any{
+		"ticket_usuario_id": tu.ID,
+		"usuario_id":        tu.UsuarioID,
+		"ticket_id":         tu.TicketID,
+		"status":            req.Status,
+		"cpf":               tu.Usuario.CPF,
+	}, nil)
 
 	ctx.Status(http.StatusNoContent)
 }
@@ -132,10 +200,32 @@ func (c *TicketUsuarioController) Delete(ctx *gin.Context) {
 		return
 	}
 
+	tu, err := c.repo.GetByID(ctx, id)
+	if err != nil {
+		audit.GetLogger().LogEvent("ticket_usuario_remover", false, map[string]any{
+			"ticket_usuario_id": id,
+		}, err)
+		ctx.JSON(http.StatusNotFound, gin.H{"erro": "registro nao encontrado"})
+		return
+	}
+
 	if err := c.repo.Delete(ctx, id); err != nil {
+		audit.GetLogger().LogEvent("ticket_usuario_remover", false, map[string]any{
+			"ticket_usuario_id": tu.ID,
+			"usuario_id":        tu.UsuarioID,
+			"ticket_id":         tu.TicketID,
+			"cpf":               tu.Usuario.CPF,
+		}, err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao remover"})
 		return
 	}
+
+	audit.GetLogger().LogEvent("ticket_usuario_remover", true, map[string]any{
+		"ticket_usuario_id": tu.ID,
+		"usuario_id":        tu.UsuarioID,
+		"ticket_id":         tu.TicketID,
+		"cpf":               tu.Usuario.CPF,
+	}, nil)
 
 	ctx.Status(http.StatusNoContent)
 }

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	model "gileade/gileade_backend/Model"
+	"gileade/gileade_backend/audit"
 	"gileade/gileade_backend/repository"
 
 	"github.com/gin-gonic/gin"
@@ -56,18 +57,27 @@ func (c *TicketController) RegisterRoutes(rg *gin.RouterGroup) {
 func (c *TicketController) Create(ctx *gin.Context) {
 	var req TicketCreateRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
+		audit.GetLogger().LogEvent("ticket_criar", false, map[string]any{
+			"nome": req.Nome,
+		}, err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "payload invalido"})
 		return
 	}
 
 	preco, err := decimal.NewFromString(req.Preco)
 	if err != nil {
+		audit.GetLogger().LogEvent("ticket_criar", false, map[string]any{
+			"nome": req.Nome,
+		}, err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "preco invalido"})
 		return
 	}
 
 	dataEvento, err := parseDate(req.DataEvento)
 	if err != nil {
+		audit.GetLogger().LogEvent("ticket_criar", false, map[string]any{
+			"nome": req.Nome,
+		}, err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "data_evento invalida (use YYYY-MM-DD)"})
 		return
 	}
@@ -81,9 +91,17 @@ func (c *TicketController) Create(ctx *gin.Context) {
 	}
 
 	if err := c.repo.Create(ctx, &ticket); err != nil {
+		audit.GetLogger().LogEvent("ticket_criar", false, map[string]any{
+			"nome": req.Nome,
+		}, err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao criar ticket"})
 		return
 	}
+
+	audit.GetLogger().LogEvent("ticket_criar", true, map[string]any{
+		"ticket_id": ticket.ID,
+		"nome":      ticket.Nome,
+	}, nil)
 
 	ctx.JSON(http.StatusCreated, toTicketResponse(ticket))
 }
@@ -94,6 +112,10 @@ func (c *TicketController) List(ctx *gin.Context) {
 
 	tickets, err := c.repo.List(ctx, limit, offset)
 	if err != nil {
+		audit.GetLogger().LogEvent("ticket_listar", false, map[string]any{
+			"limit":  limit,
+			"offset": offset,
+		}, err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao listar"})
 		return
 	}
@@ -113,9 +135,16 @@ func (c *TicketController) GetByID(ctx *gin.Context) {
 
 	ticket, err := c.repo.GetByID(ctx, id)
 	if err != nil {
+		audit.GetLogger().LogEvent("ticket_buscar", false, map[string]any{
+			"ticket_id": id,
+		}, err)
 		ctx.JSON(http.StatusNotFound, gin.H{"erro": "ticket nao encontrado"})
 		return
 	}
+
+	audit.GetLogger().LogEvent("ticket_buscar", true, map[string]any{
+		"ticket_id": ticket.ID,
+	}, nil)
 
 	ctx.JSON(http.StatusOK, toTicketResponse(ticket))
 }
@@ -128,12 +157,18 @@ func (c *TicketController) Update(ctx *gin.Context) {
 
 	var req TicketUpdateRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
+		audit.GetLogger().LogEvent("ticket_atualizar", false, map[string]any{
+			"ticket_id": id,
+		}, err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "payload invalido"})
 		return
 	}
 
 	ticket, err := c.repo.GetByID(ctx, id)
 	if err != nil {
+		audit.GetLogger().LogEvent("ticket_atualizar", false, map[string]any{
+			"ticket_id": id,
+		}, err)
 		ctx.JSON(http.StatusNotFound, gin.H{"erro": "ticket nao encontrado"})
 		return
 	}
@@ -147,6 +182,9 @@ func (c *TicketController) Update(ctx *gin.Context) {
 	if req.Preco != nil {
 		preco, err := decimal.NewFromString(*req.Preco)
 		if err != nil {
+			audit.GetLogger().LogEvent("ticket_atualizar", false, map[string]any{
+				"ticket_id": id,
+			}, err)
 			ctx.JSON(http.StatusBadRequest, gin.H{"erro": "preco invalido"})
 			return
 		}
@@ -158,6 +196,9 @@ func (c *TicketController) Update(ctx *gin.Context) {
 	if req.DataEvento != nil {
 		dataEvento, err := parseDate(*req.DataEvento)
 		if err != nil {
+			audit.GetLogger().LogEvent("ticket_atualizar", false, map[string]any{
+				"ticket_id": id,
+			}, err)
 			ctx.JSON(http.StatusBadRequest, gin.H{"erro": "data_evento invalida (use YYYY-MM-DD)"})
 			return
 		}
@@ -165,9 +206,16 @@ func (c *TicketController) Update(ctx *gin.Context) {
 	}
 
 	if err := c.repo.Update(ctx, &ticket); err != nil {
+		audit.GetLogger().LogEvent("ticket_atualizar", false, map[string]any{
+			"ticket_id": id,
+		}, err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao atualizar"})
 		return
 	}
+
+	audit.GetLogger().LogEvent("ticket_atualizar", true, map[string]any{
+		"ticket_id": ticket.ID,
+	}, nil)
 
 	ctx.JSON(http.StatusOK, toTicketResponse(ticket))
 }
@@ -179,9 +227,16 @@ func (c *TicketController) Delete(ctx *gin.Context) {
 	}
 
 	if err := c.repo.Delete(ctx, id); err != nil {
+		audit.GetLogger().LogEvent("ticket_remover", false, map[string]any{
+			"ticket_id": id,
+		}, err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao remover"})
 		return
 	}
+
+	audit.GetLogger().LogEvent("ticket_remover", true, map[string]any{
+		"ticket_id": id,
+	}, nil)
 	ctx.Status(http.StatusNoContent)
 }
 

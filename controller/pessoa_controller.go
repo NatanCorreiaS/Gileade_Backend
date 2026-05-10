@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	model "gileade/gileade_backend/Model"
+	"gileade/gileade_backend/audit"
 	"gileade/gileade_backend/repository"
 
 	"github.com/gin-gonic/gin"
@@ -78,6 +79,11 @@ func (c *PessoaController) RegisterRoutes(rg *gin.RouterGroup) {
 func (c *PessoaController) Create(ctx *gin.Context) {
 	var req PessoaCreateRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
+		audit.GetLogger().LogEvent("pessoa_criar", false, map[string]any{
+			"nome":         req.Nome,
+			"cpf":          req.CPF,
+			"tipo_usuario": req.TipoUsuario,
+		}, err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "payload invalido"})
 		return
 	}
@@ -98,6 +104,11 @@ func (c *PessoaController) Create(ctx *gin.Context) {
 		Escolaridade: req.Escolaridade,
 	}
 	if err := c.repo.Create(ctx, &pessoa); err != nil {
+		audit.GetLogger().LogEvent("pessoa_criar", false, map[string]any{
+			"nome":         pessoa.Nome,
+			"cpf":          pessoa.CPF,
+			"tipo_usuario": pessoa.TipoUsuario,
+		}, err)
 		if isUniqueViolation(err) {
 			ctx.JSON(http.StatusConflict, gin.H{"erro": "cpf ja cadastrado"})
 			return
@@ -105,6 +116,12 @@ func (c *PessoaController) Create(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao criar usuario"})
 		return
 	}
+
+	audit.GetLogger().LogEvent("pessoa_criar", true, map[string]any{
+		"pessoa_id":    pessoa.ID,
+		"cpf":          pessoa.CPF,
+		"tipo_usuario": pessoa.TipoUsuario,
+	}, nil)
 
 	ctx.JSON(http.StatusCreated, toPessoaResponse(pessoa))
 }
@@ -134,9 +151,18 @@ func (c *PessoaController) GetByID(ctx *gin.Context) {
 
 	pessoa, err := c.repo.GetByID(ctx, id)
 	if err != nil {
+		audit.GetLogger().LogEvent("pessoa_buscar", false, map[string]any{
+			"pessoa_id": id,
+		}, err)
 		ctx.JSON(http.StatusNotFound, gin.H{"erro": "usuario nao encontrado"})
 		return
 	}
+
+	audit.GetLogger().LogEvent("pessoa_buscar", true, map[string]any{
+		"pessoa_id":    pessoa.ID,
+		"cpf":          pessoa.CPF,
+		"tipo_usuario": pessoa.TipoUsuario,
+	}, nil)
 
 	ctx.JSON(http.StatusOK, toPessoaResponse(pessoa))
 }
@@ -149,12 +175,18 @@ func (c *PessoaController) Update(ctx *gin.Context) {
 
 	var req PessoaUpdateRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
+		audit.GetLogger().LogEvent("pessoa_atualizar", false, map[string]any{
+			"pessoa_id": id,
+		}, err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "payload invalido"})
 		return
 	}
 
 	pessoa, err := c.repo.GetByID(ctx, id)
 	if err != nil {
+		audit.GetLogger().LogEvent("pessoa_atualizar", false, map[string]any{
+			"pessoa_id": id,
+		}, err)
 		ctx.JSON(http.StatusNotFound, gin.H{"erro": "usuario nao encontrado"})
 		return
 	}
@@ -200,6 +232,11 @@ func (c *PessoaController) Update(ctx *gin.Context) {
 	}
 
 	if err := c.repo.Update(ctx, &pessoa); err != nil {
+		audit.GetLogger().LogEvent("pessoa_atualizar", false, map[string]any{
+			"pessoa_id":    pessoa.ID,
+			"cpf":          pessoa.CPF,
+			"tipo_usuario": pessoa.TipoUsuario,
+		}, err)
 		if isUniqueViolation(err) {
 			ctx.JSON(http.StatusConflict, gin.H{"erro": "cpf ja cadastrado"})
 			return
@@ -207,6 +244,12 @@ func (c *PessoaController) Update(ctx *gin.Context) {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao atualizar"})
 		return
 	}
+
+	audit.GetLogger().LogEvent("pessoa_atualizar", true, map[string]any{
+		"pessoa_id":    pessoa.ID,
+		"cpf":          pessoa.CPF,
+		"tipo_usuario": pessoa.TipoUsuario,
+	}, nil)
 
 	ctx.JSON(http.StatusOK, toPessoaResponse(pessoa))
 }
@@ -217,10 +260,30 @@ func (c *PessoaController) Delete(ctx *gin.Context) {
 		return
 	}
 
+	pessoa, err := c.repo.GetByID(ctx, id)
+	if err != nil {
+		audit.GetLogger().LogEvent("pessoa_remover", false, map[string]any{
+			"pessoa_id": id,
+		}, err)
+		ctx.JSON(http.StatusNotFound, gin.H{"erro": "usuario nao encontrado"})
+		return
+	}
+
 	if err := c.repo.Delete(ctx, id); err != nil {
+		audit.GetLogger().LogEvent("pessoa_remover", false, map[string]any{
+			"pessoa_id":    pessoa.ID,
+			"cpf":          pessoa.CPF,
+			"tipo_usuario": pessoa.TipoUsuario,
+		}, err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao remover"})
 		return
 	}
+
+	audit.GetLogger().LogEvent("pessoa_remover", true, map[string]any{
+		"pessoa_id":    pessoa.ID,
+		"cpf":          pessoa.CPF,
+		"tipo_usuario": pessoa.TipoUsuario,
+	}, nil)
 
 	ctx.Status(http.StatusNoContent)
 }

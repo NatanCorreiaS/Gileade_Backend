@@ -1,0 +1,5 @@
+AUDIT 2026/05/10 16:51:45 operacao=pessoa_criar status=sucesso nome=Maria Silva cpf=123***01
+AUDIT 2026/05/10 16:55:29 operacao=ticket_usuario_criar status=sucesso nome=Maria Silva cpf=123***01
+AUDIT 2026/05/10 17:04:11 operacao=pessoa_buscar status=sucesso cpf=123***01 pessoa_id=1 tipo_usuario=Usuario
+AUDIT 2026/05/10 17:04:39 operacao=ticket_usuario_criar status=falha ticket_id=1 usuario_id=2 erro=registro não encontrado
+AUDIT 2026/05/10 17:04:44 operacao=ticket_usuario_criar status=sucesso cpf=123***01 ticket_id=1 ticket_usuario_id=2 usuario_id=1

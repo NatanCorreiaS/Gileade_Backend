@@ -109,6 +109,10 @@ Cria uma pessoa (usuario/admin). A senha deve estar **hash**.
 }
 ```
 
+**Tipos de usuario**
+- `Admin`: acesso administrativo (crie pela mesma rota).
+- `Usuario`: comprador/participante.
+
 **Response 201**
 ```json
 {
@@ -267,3 +271,25 @@ Atualiza apenas o status.
 **DELETE** `/api/v1/tickets-usuario/:id`
 
 Remove o vinculo.
+
+---
+
+### Pagamentos e estornos
+
+O pagamento e registrado automaticamente quando o webhook do Mercado Pago confirma `approved`.
+Nao existe endpoint publico para criacao manual de pagamento.
+
+Estornos sao registrados no dominio com transacao e devem manter consistencia com o ticket do usuario.
+Se for expor um endpoint de estorno, use transacao e registre auditoria.
+
+---
+
+## Auditoria
+
+Os eventos relevantes de usuarios, tickets e pagamentos sao registrados no arquivo definido por `AUDIT_LOG_PATH`
+(padrao: `logs/audit.log`).
+
+Regras de seguranca na auditoria:
+- CPF e mascarado.
+- Tokens sao registrados apenas com os 2 ultimos caracteres.
+- Senhas nunca sao registradas.
