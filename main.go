@@ -12,7 +12,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Inicializa o servidor HTTP com rotas de integração Mercado Pago (Checkout Pro).
+// main inicializa o servidor HTTP e dependencias do app.
 func main() {
 	// Em desenvolvimento, carrega variáveis a partir do arquivo .env.
 	// Em produção, as variáveis devem vir do ambiente do processo.

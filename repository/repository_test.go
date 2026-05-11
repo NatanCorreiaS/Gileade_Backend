@@ -6,12 +6,14 @@ import (
 	"testing"
 	"time"
 
-	"gileade/gileade_backend/Model"
+	model "gileade/gileade_backend/Model"
 	"gileade/gileade_backend/internal/testutil"
 	"gileade/gileade_backend/repository"
+
 	"github.com/shopspring/decimal"
 )
 
+// TestPessoaRepository cobre operacoes basicas de pessoa.
 func TestPessoaRepository(t *testing.T) {
 	tdb := testutil.StartPostgres(t)
 	if err := model.AutoMigrate(tdb.DB); err != nil {
@@ -22,8 +24,8 @@ func TestPessoaRepository(t *testing.T) {
 	ctx := context.Background()
 
 	cases := []struct {
-		name string
-		cpf  string
+		name  string
+		cpf   string
 		email string
 	}{
 		{name: "pessoa-1", cpf: "00000000001", email: "fulano1@example.com"},
@@ -98,6 +100,7 @@ func TestPessoaRepository(t *testing.T) {
 	}
 }
 
+// TestTicketRepository cobre operacoes basicas de ticket.
 func TestTicketRepository(t *testing.T) {
 	tdb := testutil.StartPostgres(t)
 	if err := model.AutoMigrate(tdb.DB); err != nil {
@@ -118,11 +121,11 @@ func TestTicketRepository(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ticket := model.Ticket{
-				Nome:                tc.nome,
-				Descricao:           "VIP",
-				Preco:               decimal.NewFromFloat(10.50),
+				Nome:                 tc.nome,
+				Descricao:            "VIP",
+				Preco:                decimal.NewFromFloat(10.50),
 				QuantidadeDisponivel: 100,
-				DataEvento:          time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
+				DataEvento:           time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
 			}
 
 			if err := repo.Create(ctx, &ticket); err != nil {
@@ -168,6 +171,7 @@ func TestTicketRepository(t *testing.T) {
 	}
 }
 
+// TestTicketUsuarioRepository cobre operacoes basicas de ticket_usuario.
 func TestTicketUsuarioRepository(t *testing.T) {
 	tdb := testutil.StartPostgres(t)
 	if err := model.AutoMigrate(tdb.DB); err != nil {
@@ -207,11 +211,11 @@ func TestTicketUsuarioRepository(t *testing.T) {
 			}
 
 			ticket := model.Ticket{
-				Nome:                "Ingresso 2",
-				Descricao:           "Standard",
-				Preco:               decimal.NewFromFloat(5.00),
+				Nome:                 "Ingresso 2",
+				Descricao:            "Standard",
+				Preco:                decimal.NewFromFloat(5.00),
 				QuantidadeDisponivel: 10,
-				DataEvento:          time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
+				DataEvento:           time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
 			}
 			if err := tRepo.Create(ctx, &ticket); err != nil {
 				t.Fatalf("seed ticket: %v", err)
@@ -264,6 +268,7 @@ func TestTicketUsuarioRepository(t *testing.T) {
 	}
 }
 
+// TestPagamentoAndEstornoRepositories valida fluxo de pagamento e estorno.
 func TestPagamentoAndEstornoRepositories(t *testing.T) {
 	tdb := testutil.StartPostgres(t)
 	if err := model.AutoMigrate(tdb.DB); err != nil {
@@ -308,15 +313,16 @@ func TestPagamentoAndEstornoRepositories(t *testing.T) {
 			}
 
 			ticket := model.Ticket{
-				Nome:                "Ingresso 3",
-				Descricao:           "Standard",
-				Preco:               decimal.NewFromFloat(15.00),
+				Nome:                 "Ingresso 3",
+				Descricao:            "Standard",
+				Preco:                decimal.NewFromFloat(15.00),
 				QuantidadeDisponivel: 10,
-				DataEvento:          time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
+				DataEvento:           time.Date(2026, 5, 10, 0, 0, 0, 0, time.UTC),
 			}
 			if err := tRepo.Create(ctx, &ticket); err != nil {
 				t.Fatalf("seed ticket: %v", err)
 			}
+			quantidadeInicial := ticket.QuantidadeDisponivel
 
 			tu := model.TicketUsuario{
 				UsuarioID: pessoa.ID,
@@ -336,6 +342,14 @@ func TestPagamentoAndEstornoRepositories(t *testing.T) {
 			}
 			if err := payRepo.CreateAndMarkTicketPago(ctx, &pagamento); err != nil {
 				t.Fatalf("CreateAndMarkTicketPago: %v", err)
+			}
+
+			gotTicketPago, err := tRepo.GetByID(ctx, ticket.ID)
+			if err != nil {
+				t.Fatalf("GetByID ticket pago: %v", err)
+			}
+			if gotTicketPago.QuantidadeDisponivel != quantidadeInicial-1 {
+				t.Fatalf("quantidade_disponivel nao atualizada no pagamento")
 			}
 
 			gotTU, err := tuRepo.GetByID(ctx, tu.ID)
@@ -373,12 +387,20 @@ func TestPagamentoAndEstornoRepositories(t *testing.T) {
 			estorno := model.Estorno{
 				PagamentoID:        pagamento.ID,
 				IDTransacaoEstorno: tc.estornoTx,
-				Valor:             decimal.NewFromFloat(15.00),
-				Motivo:            "teste",
-				DataEstorno:       time.Now().UTC(),
+				Valor:              decimal.NewFromFloat(15.00),
+				Motivo:             "teste",
+				DataEstorno:        time.Now().UTC(),
 			}
 			if err := estRepo.CreateAndMarkTicketReembolsado(ctx, &estorno); err != nil {
 				t.Fatalf("CreateAndMarkTicketReembolsado: %v", err)
+			}
+
+			gotTicketEstorno, err := tRepo.GetByID(ctx, ticket.ID)
+			if err != nil {
+				t.Fatalf("GetByID ticket estorno: %v", err)
+			}
+			if gotTicketEstorno.QuantidadeDisponivel != quantidadeInicial {
+				t.Fatalf("quantidade_disponivel nao restaurada no estorno")
 			}
 
 			gotTU2, err := tuRepo.GetByID(ctx, tu.ID)

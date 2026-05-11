@@ -16,6 +16,7 @@ type PessoaController struct {
 	repo *repository.PessoaRepository
 }
 
+// NewPessoaController monta o controller de pessoas.
 func NewPessoaController(db *gorm.DB) *PessoaController {
 	return &PessoaController{repo: repository.NewPessoaRepository(db)}
 }
@@ -68,6 +69,7 @@ type PessoaResponse struct {
 	Escolaridade model.Escolaridade `json:"escolaridade"`
 }
 
+// RegisterRoutes registra os endpoints de pessoas.
 func (c *PessoaController) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/pessoas", c.Create)
 	rg.GET("/pessoas", c.List)
@@ -76,6 +78,7 @@ func (c *PessoaController) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.DELETE("/pessoas/:id", c.Delete)
 }
 
+// Create cadastra uma pessoa no sistema.
 func (c *PessoaController) Create(ctx *gin.Context) {
 	var req PessoaCreateRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -126,6 +129,7 @@ func (c *PessoaController) Create(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, toPessoaResponse(pessoa))
 }
 
+// List lista pessoas com paginacao simples.
 func (c *PessoaController) List(ctx *gin.Context) {
 	limit, _ := strconvAtoiDefault(ctx.Query("limit"), 50)
 	offset, _ := strconvAtoiDefault(ctx.Query("offset"), 0)
@@ -143,6 +147,7 @@ func (c *PessoaController) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, resp)
 }
 
+// GetByID busca uma pessoa pelo ID.
 func (c *PessoaController) GetByID(ctx *gin.Context) {
 	id, ok := parseUintParam(ctx, "id")
 	if !ok {
@@ -167,6 +172,7 @@ func (c *PessoaController) GetByID(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, toPessoaResponse(pessoa))
 }
 
+// Update atualiza dados de uma pessoa.
 func (c *PessoaController) Update(ctx *gin.Context) {
 	id, ok := parseUintParam(ctx, "id")
 	if !ok {
@@ -254,6 +260,7 @@ func (c *PessoaController) Update(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, toPessoaResponse(pessoa))
 }
 
+// Delete remove uma pessoa pelo ID.
 func (c *PessoaController) Delete(ctx *gin.Context) {
 	id, ok := parseUintParam(ctx, "id")
 	if !ok {
@@ -288,6 +295,7 @@ func (c *PessoaController) Delete(ctx *gin.Context) {
 	ctx.Status(http.StatusNoContent)
 }
 
+// toPessoaResponse converte o modelo para resposta JSON.
 func toPessoaResponse(p model.Pessoa) PessoaResponse {
 	return PessoaResponse{
 		ID:           p.ID,
@@ -306,6 +314,7 @@ func toPessoaResponse(p model.Pessoa) PessoaResponse {
 	}
 }
 
+// strconvAtoiDefault converte string para int com fallback.
 func strconvAtoiDefault(val string, def int) (int, bool) {
 	if val == "" {
 		return def, true

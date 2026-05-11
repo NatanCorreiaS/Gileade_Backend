@@ -7,7 +7,9 @@ import (
 )
 
 var ErrNotFound = errors.New("registro não encontrado")
+var ErrTicketIndisponivel = errors.New("ticket indisponivel")
 
+// mapGormErr normaliza erros do Gorm para erros de dominio.
 func mapGormErr(err error) error {
 	if err == nil {
 		return nil

@@ -21,6 +21,7 @@ type Estorno struct {
 	DataEstorno time.Time `gorm:"type:timestamp;not null" json:"data_estorno"`
 }
 
+// TableName define o nome da tabela para Estorno.
 func (Estorno) TableName() string {
 	return "estornos"
 }

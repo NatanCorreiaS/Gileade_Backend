@@ -20,6 +20,7 @@ var (
 	instance *Logger
 )
 
+// GetLogger retorna a instancia singleton do logger de auditoria.
 func GetLogger() *Logger {
 	once.Do(func() {
 		path := os.Getenv("AUDIT_LOG_PATH")
@@ -43,6 +44,7 @@ func GetLogger() *Logger {
 	return instance
 }
 
+// LogUsuarioOperation registra operacoes relacionadas a usuarios.
 func (l *Logger) LogUsuarioOperation(nome, cpf, operacao string, sucesso bool, err error) {
 	campos := map[string]any{
 		"nome": strings.TrimSpace(nome),
@@ -51,6 +53,7 @@ func (l *Logger) LogUsuarioOperation(nome, cpf, operacao string, sucesso bool, e
 	l.LogEvent(operacao, sucesso, campos, err)
 }
 
+// LogEvent registra um evento de auditoria com campos sanitizados.
 func (l *Logger) LogEvent(operacao string, sucesso bool, campos map[string]any, err error) {
 	status := "sucesso"
 	if !sucesso {
@@ -86,6 +89,7 @@ func (l *Logger) LogEvent(operacao string, sucesso bool, campos map[string]any, 
 
 var cpfDigits = regexp.MustCompile(`\d`)
 
+// maskCPF mascara o CPF deixando apenas prefixo e sufixo.
 func maskCPF(cpf string) string {
 	digits := strings.Join(cpfDigits.FindAllString(cpf, -1), "")
 	if len(digits) < 5 {
@@ -96,6 +100,7 @@ func maskCPF(cpf string) string {
 	return prefix + "***" + suffix
 }
 
+// maskToken mascara tokens preservando apenas os 2 ultimos caracteres.
 func maskToken(token string) string {
 	cleaned := strings.TrimSpace(token)
 	if cleaned == "" {
@@ -107,6 +112,7 @@ func maskToken(token string) string {
 	return strings.Repeat("*", len(cleaned)-2) + cleaned[len(cleaned)-2:]
 }
 
+// sanitizeField aplica mascaras e limpeza antes do log.
 func sanitizeField(key string, val any) string {
 	if val == nil {
 		return ""

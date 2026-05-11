@@ -18,6 +18,7 @@ type PostgresTestDB struct {
 	Container *postgres.PostgresContainer
 }
 
+// StartPostgres sobe um container Postgres para testes.
 func StartPostgres(t *testing.T) PostgresTestDB {
 	t.Helper()
 

@@ -12,20 +12,24 @@ type TicketRepository struct {
 	db *gorm.DB
 }
 
+// NewTicketRepository instancia o repositorio de tickets.
 func NewTicketRepository(db *gorm.DB) *TicketRepository {
 	return &TicketRepository{db: db}
 }
 
+// Create insere um ticket no banco.
 func (r *TicketRepository) Create(ctx context.Context, ticket *model.Ticket) error {
 	return mapGormErr(r.db.WithContext(ctx).Create(ticket).Error)
 }
 
+// GetByID busca um ticket pelo ID.
 func (r *TicketRepository) GetByID(ctx context.Context, id uint64) (model.Ticket, error) {
 	var ticket model.Ticket
 	err := r.db.WithContext(ctx).First(&ticket, id).Error
 	return ticket, mapGormErr(err)
 }
 
+// List lista tickets com paginacao simples.
 func (r *TicketRepository) List(ctx context.Context, limit, offset int) ([]model.Ticket, error) {
 	if limit <= 0 {
 		limit = 50
@@ -43,10 +47,12 @@ func (r *TicketRepository) List(ctx context.Context, limit, offset int) ([]model
 	return tickets, mapGormErr(err)
 }
 
+// Update atualiza um ticket existente.
 func (r *TicketRepository) Update(ctx context.Context, ticket *model.Ticket) error {
 	return mapGormErr(r.db.WithContext(ctx).Save(ticket).Error)
 }
 
+// Delete remove um ticket pelo ID.
 func (r *TicketRepository) Delete(ctx context.Context, id uint64) error {
 	return mapGormErr(r.db.WithContext(ctx).Delete(&model.Ticket{}, id).Error)
 }

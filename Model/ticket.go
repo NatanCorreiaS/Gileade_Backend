@@ -24,6 +24,7 @@ type Ticket struct {
 	TicketsUsuario []TicketUsuario `gorm:"foreignKey:TicketID" json:"tickets_usuario,omitempty"`
 }
 
+// TableName define o nome da tabela para Ticket.
 func (Ticket) TableName() string {
 	return "tickets"
 }

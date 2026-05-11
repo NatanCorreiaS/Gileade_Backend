@@ -13,6 +13,7 @@ type AppDeps struct {
 	MP *gateway.MercadoPagoGateway
 }
 
+// NewRouter registra as rotas HTTP do servico.
 func NewRouter(deps AppDeps) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
@@ -22,7 +23,8 @@ func NewRouter(deps AppDeps) *gin.Engine {
 	controller.NewPessoaController(deps.DB).RegisterRoutes(api)
 	controller.NewTicketController(deps.DB).RegisterRoutes(api)
 	controller.NewTicketUsuarioController(deps.DB).RegisterRoutes(api)
-	controller.NewMercadoPagoController(deps.DB, deps.MP).RegisterRoutes(api)
+	controller.NewPagamentoController(deps.DB, deps.MP).RegisterRoutes(api)
+	controller.NewEstornoController(deps.DB, deps.MP).RegisterRoutes(api)
 
 	return r
 }

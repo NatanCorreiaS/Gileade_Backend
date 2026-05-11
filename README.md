@@ -2,11 +2,15 @@
 
 Base URL (dev): `http://localhost:8080`
 
-### Criar Checkout Pro
+### Pagamentos (checkout e webhook)
 
-**POST** `/api/v1/checkout/pro`
+Os endpoints de pagamento expõem apenas a lógica de negócio. A integração com Mercado Pago ocorre na camada de serviço.
 
-Cria uma preferencia no Mercado Pago (Checkout Pro) e registra um `TicketUsuario` com status `Pendente`.
+### Criar checkout
+
+**POST** `/api/v1/pagamentos/checkout`
+
+Cria uma preferencia no Mercado Pago e registra um `TicketUsuario` com status `Pendente`.
 
 **Request JSON**
 ```json
@@ -16,7 +20,7 @@ Cria uma preferencia no Mercado Pago (Checkout Pro) e registra um `TicketUsuario
 	"success_url": "https://seu-site.com/checkout/sucesso",
 	"failure_url": "https://seu-site.com/checkout/erro",
 	"pending_url": "https://seu-site.com/checkout/pendente",
-	"notification_url": "https://seu-dominio.com/api/v1/mercadopago/webhook"
+	"notification_url": "https://seu-dominio.com/api/v1/pagamentos/webhook"
 }
 ```
 
@@ -45,11 +49,11 @@ Cria uma preferencia no Mercado Pago (Checkout Pro) e registra um `TicketUsuario
 
 ---
 
-### Webhook Mercado Pago
+### Webhook de pagamento
 
-**POST** `/api/v1/mercadopago/webhook`
+**POST** `/api/v1/pagamentos/webhook`
 
-Recebe notificacoes do Mercado Pago e registra o pagamento aprovado, marcando o `TicketUsuario` como `Pago` de forma atomica.
+Recebe notificacoes e registra o pagamento aprovado, marcando o `TicketUsuario` como `Pago` de forma atomica.
 
 O endpoint aceita `data.id` por query string ou no corpo. Exemplo de payload basico:
 
@@ -79,7 +83,7 @@ O endpoint aceita `data.id` por query string ou no corpo. Exemplo de payload bas
 
 **Erros comuns**
 - `400`: `payment id` ausente ou invalido.
-- `502`: falha ao consultar pagamento no Mercado Pago.
+- `409`: ticket indisponivel.
 - `500`: falha ao registrar pagamento no banco.
 
 ---

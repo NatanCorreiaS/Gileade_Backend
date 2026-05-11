@@ -6,10 +6,12 @@ import (
 
 	"gileade/gileade_backend/db"
 	"gileade/gileade_backend/internal/testutil"
+
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"gorm.io/gorm/logger"
 )
 
+// TestOpenPostgres valida abertura de conexao com Postgres.
 func TestOpenPostgres(t *testing.T) {
 	tdb := testutil.StartPostgres(t)
 	container := tdb.Container

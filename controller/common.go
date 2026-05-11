@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+// parseUintParam valida parametro de rota e converte para uint64.
 func parseUintParam(ctx *gin.Context, name string) (uint64, bool) {
 	val := ctx.Param(name)
 	id, err := strconv.ParseUint(val, 10, 64)
@@ -19,6 +20,7 @@ func parseUintParam(ctx *gin.Context, name string) (uint64, bool) {
 	return id, true
 }
 
+// isUniqueViolation detecta violacao de unique constraint do Postgres.
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {

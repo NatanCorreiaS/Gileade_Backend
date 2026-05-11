@@ -23,6 +23,7 @@ type Pagamento struct {
 	Estornos []Estorno `gorm:"foreignKey:PagamentoID" json:"estornos,omitempty"`
 }
 
+// TableName define o nome da tabela para Pagamento.
 func (Pagamento) TableName() string {
 	return "pagamentos"
 }

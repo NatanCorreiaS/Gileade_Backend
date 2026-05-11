@@ -16,6 +16,7 @@ type TicketUsuarioController struct {
 	pRepo *repository.PessoaRepository
 }
 
+// NewTicketUsuarioController monta o controller de tickets por usuario.
 func NewTicketUsuarioController(db *gorm.DB) *TicketUsuarioController {
 	return &TicketUsuarioController{
 		repo:  repository.NewTicketUsuarioRepository(db),
@@ -40,6 +41,7 @@ type TicketUsuarioResponse struct {
 	Status    model.TicketsStatus `json:"status"`
 }
 
+// RegisterRoutes registra os endpoints de tickets por usuario.
 func (c *TicketUsuarioController) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/tickets-usuario", c.Create)
 	rg.GET("/tickets-usuario/:id", c.GetByID)
@@ -48,6 +50,7 @@ func (c *TicketUsuarioController) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.DELETE("/tickets-usuario/:id", c.Delete)
 }
 
+// Create cria o vinculo entre usuario e ticket.
 func (c *TicketUsuarioController) Create(ctx *gin.Context) {
 	var req TicketUsuarioCreateRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -99,6 +102,7 @@ func (c *TicketUsuarioController) Create(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, toTicketUsuarioResponse(tu))
 }
 
+// GetByID busca o vinculo pelo ID.
 func (c *TicketUsuarioController) GetByID(ctx *gin.Context) {
 	id, ok := parseUintParam(ctx, "id")
 	if !ok {
@@ -124,6 +128,7 @@ func (c *TicketUsuarioController) GetByID(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, toTicketUsuarioResponse(tu))
 }
 
+// ListByUsuarioID lista tickets associados ao usuario.
 func (c *TicketUsuarioController) ListByUsuarioID(ctx *gin.Context) {
 	usuarioID, ok := parseUintParam(ctx, "id")
 	if !ok {
@@ -147,6 +152,7 @@ func (c *TicketUsuarioController) ListByUsuarioID(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, resp)
 }
 
+// UpdateStatus atualiza o status do vinculo.
 func (c *TicketUsuarioController) UpdateStatus(ctx *gin.Context) {
 	id, ok := parseUintParam(ctx, "id")
 	if !ok {
@@ -194,6 +200,7 @@ func (c *TicketUsuarioController) UpdateStatus(ctx *gin.Context) {
 	ctx.Status(http.StatusNoContent)
 }
 
+// Delete remove o vinculo entre usuario e ticket.
 func (c *TicketUsuarioController) Delete(ctx *gin.Context) {
 	id, ok := parseUintParam(ctx, "id")
 	if !ok {
@@ -230,6 +237,7 @@ func (c *TicketUsuarioController) Delete(ctx *gin.Context) {
 	ctx.Status(http.StatusNoContent)
 }
 
+// toTicketUsuarioResponse converte o modelo para resposta JSON.
 func toTicketUsuarioResponse(tu model.TicketUsuario) TicketUsuarioResponse {
 	return TicketUsuarioResponse{
 		ID:        tu.ID,

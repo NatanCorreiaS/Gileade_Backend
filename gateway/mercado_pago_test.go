@@ -17,20 +17,24 @@ type fakePreferenceClient struct {
 	createErr    error
 }
 
+// Create registra chamada de criacao de preferencia.
 func (f *fakePreferenceClient) Create(ctx context.Context, request preference.Request) (*preference.Response, error) {
 	f.createCalled = true
 	f.createReq = request
 	return f.createResp, f.createErr
 }
 
+// Get nao e utilizado nos testes atuais.
 func (f *fakePreferenceClient) Get(ctx context.Context, id string) (*preference.Response, error) {
 	return nil, errors.New("not implemented")
 }
 
+// Update nao e utilizado nos testes atuais.
 func (f *fakePreferenceClient) Update(ctx context.Context, id string, request preference.Request) (*preference.Response, error) {
 	return nil, errors.New("not implemented")
 }
 
+// Search nao e utilizado nos testes atuais.
 func (f *fakePreferenceClient) Search(ctx context.Context, request preference.SearchRequest) (*preference.PagingResponse, error) {
 	return nil, errors.New("not implemented")
 }
@@ -42,32 +46,39 @@ type fakePaymentClient struct {
 	getErr    error
 }
 
+// Create nao e utilizado nos testes atuais.
 func (f *fakePaymentClient) Create(ctx context.Context, request payment.Request) (*payment.Response, error) {
 	return nil, errors.New("not implemented")
 }
 
+// Search nao e utilizado nos testes atuais.
 func (f *fakePaymentClient) Search(ctx context.Context, request payment.SearchRequest) (*payment.SearchResponse, error) {
 	return nil, errors.New("not implemented")
 }
 
+// Get retorna o pagamento configurado no fake.
 func (f *fakePaymentClient) Get(ctx context.Context, id int) (*payment.Response, error) {
 	f.getCalled = true
 	f.getID = id
 	return f.getResp, f.getErr
 }
 
+// Cancel nao e utilizado nos testes atuais.
 func (f *fakePaymentClient) Cancel(ctx context.Context, id int) (*payment.Response, error) {
 	return nil, errors.New("not implemented")
 }
 
+// Capture nao e utilizado nos testes atuais.
 func (f *fakePaymentClient) Capture(ctx context.Context, id int) (*payment.Response, error) {
 	return nil, errors.New("not implemented")
 }
 
+// CaptureAmount nao e utilizado nos testes atuais.
 func (f *fakePaymentClient) CaptureAmount(ctx context.Context, id int, amount float64) (*payment.Response, error) {
 	return nil, errors.New("not implemented")
 }
 
+// TestNewMercadoPagoGatewayFromEnv valida leitura de token do ambiente.
 func TestNewMercadoPagoGatewayFromEnv(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -107,6 +118,7 @@ func TestNewMercadoPagoGatewayFromEnv(t *testing.T) {
 	}
 }
 
+// TestGatewayCreateCheckoutPro valida criacao de preferencia via gateway.
 func TestGatewayCreateCheckoutPro(t *testing.T) {
 	cfg, err := config.New("token")
 	if err != nil {
@@ -117,7 +129,7 @@ func TestGatewayCreateCheckoutPro(t *testing.T) {
 	prefClient := &fakePreferenceClient{createResp: prefResp}
 	payClient := &fakePaymentClient{}
 
-	gw, err := NewMercadoPagoGateway(cfg, prefClient, payClient)
+	gw, err := NewMercadoPagoGateway(cfg, prefClient, payClient, nil)
 	if err != nil {
 		t.Fatalf("NewMercadoPagoGateway: %v", err)
 	}
@@ -134,6 +146,7 @@ func TestGatewayCreateCheckoutPro(t *testing.T) {
 	}
 }
 
+// TestGatewayGetPayment valida consulta de pagamento via gateway.
 func TestGatewayGetPayment(t *testing.T) {
 	cfg, err := config.New("token")
 	if err != nil {
@@ -144,7 +157,7 @@ func TestGatewayGetPayment(t *testing.T) {
 	prefClient := &fakePreferenceClient{}
 	payClient := &fakePaymentClient{getResp: payResp}
 
-	gw, err := NewMercadoPagoGateway(cfg, prefClient, payClient)
+	gw, err := NewMercadoPagoGateway(cfg, prefClient, payClient, nil)
 	if err != nil {
 		t.Fatalf("NewMercadoPagoGateway: %v", err)
 	}
@@ -164,8 +177,9 @@ func TestGatewayGetPayment(t *testing.T) {
 	}
 }
 
+// TestNewMercadoPagoGatewayWithNilConfig valida erro para config nula.
 func TestNewMercadoPagoGatewayWithNilConfig(t *testing.T) {
-	if _, err := NewMercadoPagoGateway(nil, nil, nil); err == nil {
+	if _, err := NewMercadoPagoGateway(nil, nil, nil, nil); err == nil {
 		t.Fatalf("expected error")
 	}
 }

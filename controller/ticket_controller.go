@@ -17,6 +17,7 @@ type TicketController struct {
 	repo *repository.TicketRepository
 }
 
+// NewTicketController monta o controller de tickets.
 func NewTicketController(db *gorm.DB) *TicketController {
 	return &TicketController{repo: repository.NewTicketRepository(db)}
 }
@@ -46,6 +47,7 @@ type TicketResponse struct {
 	DataEvento           string          `json:"data_evento"`
 }
 
+// RegisterRoutes registra os endpoints de tickets.
 func (c *TicketController) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/tickets", c.Create)
 	rg.GET("/tickets", c.List)
@@ -54,6 +56,7 @@ func (c *TicketController) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.DELETE("/tickets/:id", c.Delete)
 }
 
+// Create cadastra um ticket de evento.
 func (c *TicketController) Create(ctx *gin.Context) {
 	var req TicketCreateRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -106,6 +109,7 @@ func (c *TicketController) Create(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, toTicketResponse(ticket))
 }
 
+// List lista tickets com paginacao simples.
 func (c *TicketController) List(ctx *gin.Context) {
 	limit, _ := strconvAtoiDefault(ctx.Query("limit"), 50)
 	offset, _ := strconvAtoiDefault(ctx.Query("offset"), 0)
@@ -127,6 +131,7 @@ func (c *TicketController) List(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, resp)
 }
 
+// GetByID busca um ticket pelo ID.
 func (c *TicketController) GetByID(ctx *gin.Context) {
 	id, ok := parseUintParam(ctx, "id")
 	if !ok {
@@ -149,6 +154,7 @@ func (c *TicketController) GetByID(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, toTicketResponse(ticket))
 }
 
+// Update atualiza dados de um ticket.
 func (c *TicketController) Update(ctx *gin.Context) {
 	id, ok := parseUintParam(ctx, "id")
 	if !ok {
@@ -220,6 +226,7 @@ func (c *TicketController) Update(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, toTicketResponse(ticket))
 }
 
+// Delete remove um ticket pelo ID.
 func (c *TicketController) Delete(ctx *gin.Context) {
 	id, ok := parseUintParam(ctx, "id")
 	if !ok {
@@ -240,6 +247,7 @@ func (c *TicketController) Delete(ctx *gin.Context) {
 	ctx.Status(http.StatusNoContent)
 }
 
+// toTicketResponse converte o modelo para resposta JSON.
 func toTicketResponse(t model.Ticket) TicketResponse {
 	return TicketResponse{
 		ID:                   t.ID,
@@ -251,6 +259,7 @@ func toTicketResponse(t model.Ticket) TicketResponse {
 	}
 }
 
+// parseDate converte data no formato YYYY-MM-DD.
 func parseDate(val string) (time.Time, error) {
 	return time.Parse("2006-01-02", val)
 }

@@ -23,6 +23,7 @@ type PostgresConfig struct {
 	LogLevel logger.LogLevel
 }
 
+// NewPostgresConfigFromEnv monta a config do Postgres a partir do ambiente.
 func NewPostgresConfigFromEnv() (PostgresConfig, error) {
 	host, err := requiredEnv("DB_HOST")
 	if err != nil {
@@ -71,6 +72,7 @@ func NewPostgresConfigFromEnv() (PostgresConfig, error) {
 	}, nil
 }
 
+// OpenPostgres abre uma conexao Gorm com Postgres.
 func OpenPostgres(cfg PostgresConfig) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
 		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s TimeZone=%s",
@@ -110,6 +112,7 @@ func OpenPostgres(cfg PostgresConfig) (*gorm.DB, error) {
 	return db, nil
 }
 
+// requiredEnv valida a existencia de uma variavel de ambiente obrigatoria.
 func requiredEnv(key string) (string, error) {
 	v := os.Getenv(key)
 	if v == "" {
