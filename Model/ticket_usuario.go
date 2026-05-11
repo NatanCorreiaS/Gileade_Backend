@@ -13,6 +13,8 @@ type TicketUsuario struct {
 
 	Status TicketsStatus `gorm:"type:text;not null" json:"status"`
 
+	PreferenceID string `gorm:"type:text" json:"preference_id"`
+
 	TicketID uint64 `gorm:"type:bigint;not null;index" json:"id_ticket"`
 	Ticket   Ticket `gorm:"foreignKey:TicketID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"ticket"`
 

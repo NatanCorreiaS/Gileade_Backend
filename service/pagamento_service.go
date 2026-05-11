@@ -93,7 +93,6 @@ func (s *PagamentoService) CriarCheckout(ctx context.Context, req CheckoutReques
 				Quantity:    1,
 			},
 		},
-		AutoReturn:        "approved",
 		ExternalReference: fmt.Sprintf("%d", tu.ID),
 		BinaryMode:        true,
 		Metadata: map[string]any{
@@ -110,6 +109,9 @@ func (s *PagamentoService) CriarCheckout(ctx context.Context, req CheckoutReques
 			Pending: req.PendingURL,
 		}
 	}
+	if req.SuccessURL != "" {
+		prefReq.AutoReturn = "approved"
+	}
 
 	notificationURL := req.NotificationURL
 	if notificationURL == "" {
@@ -124,6 +126,9 @@ func (s *PagamentoService) CriarCheckout(ctx context.Context, req CheckoutReques
 	prefResp, err := s.gw.CreateCheckoutPro(ctx, prefReq)
 	if err != nil {
 		_ = s.tuRepo.Delete(ctx, tu.ID)
+		return CheckoutResponse{}, err
+	}
+	if err := s.tuRepo.UpdatePreferenceID(ctx, tu.ID, prefResp.ID); err != nil {
 		return CheckoutResponse{}, err
 	}
 

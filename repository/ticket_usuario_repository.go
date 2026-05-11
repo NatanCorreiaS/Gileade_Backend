@@ -86,6 +86,21 @@ func (r *TicketUsuarioRepository) UpdateStatus(ctx context.Context, id uint64, s
 	return nil
 }
 
+// UpdatePreferenceID atualiza o preference_id de um ticket_usuario.
+func (r *TicketUsuarioRepository) UpdatePreferenceID(ctx context.Context, id uint64, preferenceID string) error {
+	res := r.db.WithContext(ctx).
+		Model(&model.TicketUsuario{}).
+		Where("id = ?", id).
+		Update("preference_id", preferenceID)
+	if res.Error != nil {
+		return mapGormErr(res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // Delete remove um ticket_usuario pelo ID.
 func (r *TicketUsuarioRepository) Delete(ctx context.Context, id uint64) error {
 	return mapGormErr(r.db.WithContext(ctx).Delete(&model.TicketUsuario{}, id).Error)

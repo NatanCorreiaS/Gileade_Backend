@@ -111,6 +111,12 @@ func (c *PagamentoController) HandleWebhook(ctx *gin.Context) {
 	payload := WebhookPayload{}
 	_ = ctx.ShouldBindJSON(&payload)
 
+	topic := strings.TrimSpace(ctx.Query("topic"))
+	if topic == "merchant_order" {
+		ctx.JSON(http.StatusOK, gin.H{"status": "ignorado"})
+		return
+	}
+
 	paymentIDStr := strings.TrimSpace(ctx.Query("data.id"))
 	if paymentIDStr == "" {
 		paymentIDStr = strings.TrimSpace(ctx.Query("id"))
@@ -127,6 +133,10 @@ func (c *PagamentoController) HandleWebhook(ctx *gin.Context) {
 
 	paymentID, err := strconv.Atoi(paymentIDStr)
 	if err != nil {
+		if topic != "" {
+			ctx.JSON(http.StatusOK, gin.H{"status": "ignorado"})
+			return
+		}
 		audit.GetLogger().LogEvent("pagamento_webhook", false, map[string]any{
 			"payment_id": paymentIDStr,
 		}, err)

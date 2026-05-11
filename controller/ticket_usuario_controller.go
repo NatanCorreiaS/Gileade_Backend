@@ -35,10 +35,11 @@ type TicketUsuarioStatusRequest struct {
 }
 
 type TicketUsuarioResponse struct {
-	ID        uint64              `json:"id"`
-	UsuarioID uint64              `json:"usuario_id"`
-	TicketID  uint64              `json:"ticket_id"`
-	Status    model.TicketsStatus `json:"status"`
+	ID           uint64              `json:"id"`
+	UsuarioID    uint64              `json:"usuario_id"`
+	TicketID     uint64              `json:"ticket_id"`
+	Status       model.TicketsStatus `json:"status"`
+	PreferenceID string              `json:"preference_id"`
 }
 
 // RegisterRoutes registra os endpoints de tickets por usuario.
@@ -240,9 +241,10 @@ func (c *TicketUsuarioController) Delete(ctx *gin.Context) {
 // toTicketUsuarioResponse converte o modelo para resposta JSON.
 func toTicketUsuarioResponse(tu model.TicketUsuario) TicketUsuarioResponse {
 	return TicketUsuarioResponse{
-		ID:        tu.ID,
-		UsuarioID: tu.UsuarioID,
-		TicketID:  tu.TicketID,
-		Status:    tu.Status,
+		ID:           tu.ID,
+		UsuarioID:    tu.UsuarioID,
+		TicketID:     tu.TicketID,
+		Status:       tu.Status,
+		PreferenceID: tu.PreferenceID,
 	}
 }
