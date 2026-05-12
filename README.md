@@ -2,15 +2,11 @@
 
 Base URL (dev): `http://localhost:8080`
 
-### Pagamentos (checkout e webhook)
+### Criar Checkout Pro
 
-Os endpoints de pagamento expõem apenas a lógica de negócio. A integração com Mercado Pago ocorre na camada de serviço.
+**POST** `/api/v1/checkout/pro`
 
-### Criar checkout
-
-**POST** `/api/v1/pagamentos/checkout`
-
-Cria uma preferencia no Mercado Pago e registra um `TicketUsuario` com status `Pendente`.
+Cria uma preferencia no Mercado Pago (Checkout Pro) e registra um `TicketUsuario` com status `Pendente`.
 
 **Request JSON**
 ```json
@@ -20,7 +16,7 @@ Cria uma preferencia no Mercado Pago e registra um `TicketUsuario` com status `P
 	"success_url": "https://seu-site.com/checkout/sucesso",
 	"failure_url": "https://seu-site.com/checkout/erro",
 	"pending_url": "https://seu-site.com/checkout/pendente",
-	"notification_url": "https://seu-dominio.com/api/v1/pagamentos/webhook"
+	"notification_url": "https://seu-dominio.com/api/v1/mercadopago/webhook"
 }
 ```
 
@@ -49,11 +45,11 @@ Cria uma preferencia no Mercado Pago e registra um `TicketUsuario` com status `P
 
 ---
 
-### Webhook de pagamento
+### Webhook Mercado Pago
 
-**POST** `/api/v1/pagamentos/webhook`
+**POST** `/api/v1/mercadopago/webhook`
 
-Recebe notificacoes e registra o pagamento aprovado, marcando o `TicketUsuario` como `Pago` de forma atomica.
+Recebe notificacoes do Mercado Pago e registra o pagamento aprovado, marcando o `TicketUsuario` como `Pago` de forma atomica.
 
 O endpoint aceita `data.id` por query string ou no corpo. Exemplo de payload basico:
 
@@ -83,7 +79,7 @@ O endpoint aceita `data.id` por query string ou no corpo. Exemplo de payload bas
 
 **Erros comuns**
 - `400`: `payment id` ausente ou invalido.
-- `409`: ticket indisponivel.
+- `502`: falha ao consultar pagamento no Mercado Pago.
 - `500`: falha ao registrar pagamento no banco.
 
 ---
@@ -285,6 +281,88 @@ Nao existe endpoint publico para criacao manual de pagamento.
 
 Estornos sao registrados no dominio com transacao e devem manter consistencia com o ticket do usuario.
 Se for expor um endpoint de estorno, use transacao e registre auditoria.
+
+---
+
+## Teste rapido de compra (Checkout Pro)
+
+Passo a passo com apenas os endpoints necessarios para criar usuario e ticket, gerar o checkout e finalizar a compra.
+
+### 1) Criar usuario
+
+**POST** `/api/v1/pessoas`
+
+**Request JSON**
+```json
+{
+	"nome": "Teste Compra",
+	"tipo_usuario": "Usuario",
+	"senha": "hash_da_senha",
+	"cpf": "40402519890",
+	"idade": 30,
+	"igreja": "Igreja Teste",
+	"papel_igreja": "Membro",
+	"estado_civil": "Solteiro(a)",
+	"email": "teste.compra@exemplo.com",
+	"sexo": "Masculino",
+	"cidade": "Sao Paulo",
+	"estado_uf": "SP",
+	"escolaridade": "Ensino Superior Completo"
+}
+```
+
+Guarde o `id` retornado para usar como `usuario_id`.
+
+### 2) Criar ticket
+
+**POST** `/api/v1/tickets`
+
+**Request JSON**
+```json
+{
+	"nome": "Ingresso Teste",
+	"descricao": "Entrada para teste rapido",
+	"preco": "10.00",
+	"quantidade_disponivel": 10,
+	"data_evento": "2026-10-20"
+}
+```
+
+Guarde o `id` retornado para usar como `ticket_id`.
+
+### 3) Criar Checkout Pro
+
+**POST** `/api/v1/checkout/pro`
+
+**Request JSON**
+```json
+{
+	"usuario_id": 1,
+	"ticket_id": 2,
+	"success_url": "https://seu-site.com/checkout/sucesso",
+	"failure_url": "https://seu-site.com/checkout/erro",
+	"pending_url": "https://seu-site.com/checkout/pendente"
+}
+```
+
+Use os IDs retornados nos passos 1 e 2. Copie o `init_point` da resposta.
+
+### 4) Abrir o Checkout Pro
+
+- Abra o `init_point` em uma aba anonima.
+- Faca login com:
+  - usuario: `TESTUSER4040251989076800435`
+  - senha: `u1y8ImOFiV`
+  - codigo de verificacao: `672106` (caso seja solicitado algum codigo de email)
+
+Se apos logar nao for redirecionado para a compra, abra novamente o link do `init_point`.
+
+### 5) Finalizar o pagamento
+
+- Use qualquer opcao de cartao de credito ou saldo.
+- Se usar cartao e for solicitado:
+  - senha de seguranca: `123`
+  - validade: `11/30`
 
 ---
 
