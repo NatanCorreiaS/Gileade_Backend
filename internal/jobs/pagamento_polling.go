@@ -1,8 +1,9 @@
-package jobs
+package service
 
 import (
 	"context"
-	"log"
+	"errors"
+	"fmt"
 	"os"
 	"strconv"
 	"time"
@@ -10,93 +11,313 @@ import (
 	model "gileade/gileade_backend/Model"
 	"gileade/gileade_backend/gateway"
 	"gileade/gileade_backend/repository"
-	"gileade/gileade_backend/service"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/mercadopago/sdk-go/pkg/payment"
+	"github.com/mercadopago/sdk-go/pkg/preference"
+	"github.com/mercadopago/sdk-go/pkg/refund"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
-const (
-	defaultPollIntervalSeconds = 60
-	defaultPollBatchSize       = 50
-)
+type CheckoutRequest struct {
+	UsuarioID       uint64
+	TicketID        uint64
+	SuccessURL      string
+	FailureURL      string
+	PendingURL      string
+	NotificationURL string
+}
 
-// StartPagamentoPolling inicia o job de confirmacao periodica de pagamentos.
-func StartPagamentoPolling(ctx context.Context, db *gorm.DB, gw *gateway.MercadoPagoGateway) {
-	interval := readEnvInt("PAGAMENTO_POLL_INTERVAL_SECONDS", defaultPollIntervalSeconds)
-	batchSize := readEnvInt("PAGAMENTO_POLL_BATCH_SIZE", defaultPollBatchSize)
+type CheckoutResponse struct {
+	PreferenceID    string
+	InitPoint       string
+	SandboxInit     string
+	TicketUsuarioID uint64
+}
 
-	ticker := time.NewTicker(time.Duration(interval) * time.Second)
-	defer ticker.Stop()
+var ErrNotificationURLObrigatoria = errors.New("notification_url obrigatoria")
+var ErrExternalReferenceInvalida = errors.New("external_reference invalida")
 
-	service := service.NewPagamentoService(db, gw)
-	tuRepo := repository.NewTicketUsuarioRepository(db)
+type PagamentoService struct {
+	pRepo   *repository.PessoaRepository
+	tRepo   *repository.TicketRepository
+	tuRepo  *repository.TicketUsuarioRepository
+	payRepo *repository.PagamentoRepository
+	estRepo *repository.EstornoRepository
+	gw      *gateway.MercadoPagoGateway
+}
 
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-			processarPendentes(ctx, service, tuRepo, batchSize)
-		}
+func NewPagamentoService(db *gorm.DB, gw *gateway.MercadoPagoGateway) *PagamentoService {
+	return &PagamentoService{
+		pRepo:   repository.NewPessoaRepository(db),
+		tRepo:   repository.NewTicketRepository(db),
+		tuRepo:  repository.NewTicketUsuarioRepository(db),
+		payRepo: repository.NewPagamentoRepository(db),
+		estRepo: repository.NewEstornoRepository(db),
+		gw:      gw,
 	}
 }
 
-// processarPendentes busca tickets pendentes e confirma pagamentos aprovados.
-func processarPendentes(ctx context.Context, svc *service.PagamentoService, tuRepo *repository.TicketUsuarioRepository, batchSize int) {
-	pendentes, err := tuRepo.ListByStatus(ctx, model.TicketsStatusPendente, batchSize, 0)
+// CriarCheckout cria o checkout e persiste o ticket do usuario como pendente.
+func (s *PagamentoService) CriarCheckout(ctx context.Context, req CheckoutRequest) (CheckoutResponse, error) {
+	pessoa, err := s.pRepo.GetByID(ctx, req.UsuarioID)
 	if err != nil {
-		log.Printf("poll pagamentos: falha ao listar pendentes: %v", err)
-		return
+		return CheckoutResponse{}, err
 	}
 
-	for _, tu := range pendentes {
-		resp, err := consultarPagamento(ctx, svc, tu.ID)
-		if err != nil {
-			log.Printf("poll pagamentos: tu=%d erro=%v", tu.ID, err)
-			continue
-		}
-		_ = resp
+	ticket, err := s.tRepo.GetByID(ctx, req.TicketID)
+	if err != nil {
+		return CheckoutResponse{}, err
 	}
-}
 
-// consultarPagamento busca pagamentos aprovados para um ticket_usuario.
-func consultarPagamento(ctx context.Context, svc *service.PagamentoService, ticketUsuarioID uint64) (*payment.Response, error) {
-	searchReq := payment.SearchRequest{
-		Limit:  1,
-		Offset: 0,
-		Filters: map[string]string{
-			"external_reference": strconv.FormatUint(ticketUsuarioID, 10),
-			"status":             "approved",
+	tu := model.TicketUsuario{
+		UsuarioID: pessoa.ID,
+		TicketID:  ticket.ID,
+		Status:    model.TicketsStatusPendente,
+	}
+	if err := s.tuRepo.Create(ctx, &tu); err != nil {
+		return CheckoutResponse{}, err
+	}
+
+	price, _ := ticket.Preco.Float64()
+	prefReq := preference.Request{
+		Items: []preference.ItemRequest{
+			{
+				ID:          fmt.Sprintf("%d", ticket.ID),
+				Title:       ticket.Nome,
+				Description: ticket.Descricao,
+				CurrencyID:  "BRL",
+				UnitPrice:   price,
+				Quantity:    1,
+			},
+		},
+		// Configuração do Payer obrigatória para Cartões de Crédito e Testes de Cenário
+		Payer: &preference.PayerRequest{
+			Name:  pessoa.Nome, // Para testes, altere no banco para 'APRO', 'FUND', etc.
+			Email: pessoa.Email,
+			Identification: &preference.IdentificationRequest{
+				Type:   "CPF",
+				Number: "12345678909", // CPF de teste padrão da documentação
+			},
+		},
+		ExternalReference: fmt.Sprintf("%d", tu.ID),
+		BinaryMode:        true,
+		Metadata: map[string]any{
+			"ticket_usuario_id": tu.ID,
+			"usuario_id":        pessoa.ID,
+			"ticket_id":         ticket.ID,
 		},
 	}
 
-	searchResp, err := svc.SearchPayments(ctx, searchReq)
-	if err != nil {
-		return nil, err
+	if req.SuccessURL != "" || req.FailureURL != "" || req.PendingURL != "" {
+		prefReq.BackURLs = &preference.BackURLsRequest{
+			Success: req.SuccessURL,
+			Failure: req.FailureURL,
+			Pending: req.PendingURL,
+		}
 	}
-	if len(searchResp.Results) == 0 {
-		return nil, nil
-	}
-
-	result := searchResp.Results[0]
-	_, err = svc.ConfirmarPagamento(ctx, ticketUsuarioID, result.ID)
-	if err != nil {
-		return &result, err
+	
+	if req.SuccessURL != "" {
+		prefReq.AutoReturn = "approved"
 	}
 
-	return &result, nil
+	notificationURL := req.NotificationURL
+	if notificationURL == "" {
+		notificationURL = os.Getenv("MERCADO_PAGO_NOTIFICATION_URL")
+	}
+	if notificationURL == "" {
+		_ = s.tuRepo.Delete(ctx, tu.ID)
+		return CheckoutResponse{}, ErrNotificationURLObrigatoria
+	}
+	prefReq.NotificationURL = notificationURL
+
+	prefResp, err := s.gw.CreateCheckoutPro(ctx, prefReq)
+	if err != nil {
+		_ = s.tuRepo.Delete(ctx, tu.ID)
+		return CheckoutResponse{}, err
+	}
+	
+	if err := s.tuRepo.UpdatePreferenceID(ctx, tu.ID, prefResp.ID); err != nil {
+		return CheckoutResponse{}, err
+	}
+
+	return CheckoutResponse{
+		PreferenceID:    prefResp.ID,
+		InitPoint:       prefResp.InitPoint,
+		SandboxInit:     prefResp.SandboxInitPoint,
+		TicketUsuarioID: tu.ID,
+	}, nil
 }
 
-// readEnvInt le um inteiro do ambiente com fallback seguro.
-func readEnvInt(name string, def int) int {
-	val := os.Getenv(name)
-	if val == "" {
-		return def
+type WebhookResultado struct {
+	Status          string
+	TicketUsuarioID uint64
+	UsuarioID       uint64
+	TicketID        uint64
+	CPF             string
+}
+
+// ProcessarPagamentoWebhook confirma pagamento aprovado e persiste o resultado.
+func (s *PagamentoService) ProcessarPagamentoWebhook(ctx context.Context, paymentID int) (WebhookResultado, error) {
+	payResp, err := s.gw.GetPayment(ctx, paymentID)
+	if err != nil {
+		return WebhookResultado{}, err
 	}
-	parsed, err := strconv.Atoi(val)
-	if err != nil || parsed <= 0 {
-		return def
+
+	result := WebhookResultado{Status: payResp.Status}
+	
+	// Se o status for rejeitado ou outro que não seja aprovado, apenas retornamos o status
+	if payResp.Status != "approved" {
+		return result, nil
 	}
-	return parsed
+
+	tuID, err := strconv.ParseUint(payResp.ExternalReference, 10, 64)
+	if err != nil {
+		return WebhookResultado{}, ErrExternalReferenceInvalida
+	}
+
+	tu, err := s.tuRepo.GetByID(ctx, tuID)
+	if err != nil {
+		return WebhookResultado{}, err
+	}
+	
+	result.TicketUsuarioID = tu.ID
+	result.UsuarioID = tu.UsuarioID
+	result.TicketID = tu.TicketID
+	result.CPF = tu.Usuario.CPF
+
+	dataPagamento := time.Now().UTC()
+	if !payResp.DateApproved.IsZero() {
+		dataPagamento = payResp.DateApproved
+	}
+
+	pagamento := model.Pagamento{
+		IDTransacao:      fmt.Sprintf("%d", payResp.ID),
+		Valor:            decimal.NewFromFloat(payResp.TransactionAmount),
+		TicketsUsuarioID: tuID,
+		Metodo:           mapMetodoPagamento(payResp.PaymentTypeID),
+		DataPagamento:    dataPagamento,
+	}
+
+	if err := s.payRepo.CreateAndMarkTicketPago(ctx, &pagamento); err != nil {
+		if isUniqueViolation(err) {
+			result.Status = "duplicado"
+			return result, nil
+		}
+		if errors.Is(err, repository.ErrTicketIndisponivel) {
+			result.Status = "ticket_indisponivel"
+			return result, err
+		}
+		return WebhookResultado{}, err
+	}
+
+	result.Status = "ok"
+	return result, nil
+}
+
+func (s *PagamentoService) SearchPayments(ctx context.Context, req payment.SearchRequest) (*payment.SearchResponse, error) {
+	return s.gw.SearchPayments(ctx, req)
+}
+
+func (s *PagamentoService) CriarEstornoPorPagamentoID(ctx context.Context, pagamentoID uint64, motivo string, valor *decimal.Decimal) (model.Estorno, error) {
+	pagamento, err := s.payRepo.GetByID(ctx, pagamentoID)
+	if err != nil {
+		return model.Estorno{}, err
+	}
+
+	paymentID, err := strconv.Atoi(pagamento.IDTransacao)
+	if err != nil {
+		return model.Estorno{}, fmt.Errorf("id_transacao invalido")
+	}
+
+	refundResp, err := s.criarRefund(ctx, paymentID, valor)
+	if err != nil {
+		return model.Estorno{}, err
+	}
+
+	dataEstorno := time.Now().UTC()
+	if !refundResp.DateCreated.IsZero() {
+		dataEstorno = refundResp.DateCreated
+	}
+
+	estorno := model.Estorno{
+		PagamentoID:        pagamento.ID,
+		IDTransacaoEstorno: fmt.Sprintf("%d", refundResp.ID),
+		Valor:              decimal.NewFromFloat(refundResp.Amount),
+		Motivo:             motivo,
+		DataEstorno:        dataEstorno,
+	}
+
+	if err := s.estRepo.CreateAndMarkTicketReembolsado(ctx, &estorno); err != nil {
+		if isUniqueViolation(err) {
+			return estorno, nil
+		}
+		return model.Estorno{}, err
+	}
+
+	return estorno, nil
+}
+
+func (s *PagamentoService) CriarEstornoPorPaymentID(ctx context.Context, paymentID int, motivo string, valor *decimal.Decimal) (model.Estorno, error) {
+	pagamento, err := s.payRepo.GetByIDTransacao(ctx, fmt.Sprintf("%d", paymentID))
+	if err != nil {
+		return model.Estorno{}, err
+	}
+
+	refundResp, err := s.criarRefund(ctx, paymentID, valor)
+	if err != nil {
+		return model.Estorno{}, err
+	}
+
+	dataEstorno := time.Now().UTC()
+	if !refundResp.DateCreated.IsZero() {
+		dataEstorno = refundResp.DateCreated
+	}
+
+	estorno := model.Estorno{
+		PagamentoID:        pagamento.ID,
+		IDTransacaoEstorno: fmt.Sprintf("%d", refundResp.ID),
+		Valor:              decimal.NewFromFloat(refundResp.Amount),
+		Motivo:             motivo,
+		DataEstorno:        dataEstorno,
+	}
+
+	if err := s.estRepo.CreateAndMarkTicketReembolsado(ctx, &estorno); err != nil {
+		if isUniqueViolation(err) {
+			return estorno, nil
+		}
+		return model.Estorno{}, err
+	}
+
+	return estorno, nil
+}
+
+func (s *PagamentoService) criarRefund(ctx context.Context, paymentID int, valor *decimal.Decimal) (*refund.Response, error) {
+	if valor != nil {
+		floatVal, _ := valor.Float64()
+		return s.gw.CreatePartialRefund(ctx, paymentID, floatVal)
+	}
+	return s.gw.CreateRefund(ctx, paymentID)
+}
+
+func mapMetodoPagamento(paymentTypeID string) model.MetodoPagamento {
+	switch paymentTypeID {
+	case "credit_card", "debit_card":
+		return model.MetodoPagamentoCartaoCredito
+	case "ticket":
+		return model.MetodoPagamentoBoleto
+	case "pix":
+		return model.MetodoPagamentoPix
+	default:
+		return model.MetodoPagamentoPix
+	}
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
+	return false
 }

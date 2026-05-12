@@ -20,7 +20,6 @@ type PagamentoController struct {
 	payService *service.PagamentoService
 }
 
-// NewPagamentoController monta o controller de pagamentos.
 func NewPagamentoController(db *gorm.DB, gw *gateway.MercadoPagoGateway) *PagamentoController {
 	return &PagamentoController{payService: service.NewPagamentoService(db, gw)}
 }
@@ -42,19 +41,18 @@ type CheckoutResponse struct {
 }
 
 type WebhookPayload struct {
-	Type string `json:"type"`
-	Data struct {
-		ID string `json:"id"`
+	Action string `json:"action"`
+	Type   string `json:"type"`
+	Data   struct {
+		ID any `json:"id"`
 	} `json:"data"`
 }
 
-// RegisterRoutes registra os endpoints de pagamentos.
 func (c *PagamentoController) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/pagamentos/checkout", c.CreateCheckout)
 	rg.POST("/pagamentos/webhook", c.HandleWebhook)
 }
 
-// CreateCheckout cria checkout e ticket pendente para o usuario.
 func (c *PagamentoController) CreateCheckout(ctx *gin.Context) {
 	var req CheckoutRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -106,23 +104,42 @@ func (c *PagamentoController) CreateCheckout(ctx *gin.Context) {
 	})
 }
 
-// HandleWebhook processa notificacoes de pagamento aprovadas.
 func (c *PagamentoController) HandleWebhook(ctx *gin.Context) {
-	payload := WebhookPayload{}
+	var payload WebhookPayload
 	_ = ctx.ShouldBindJSON(&payload)
 
-	topic := strings.TrimSpace(ctx.Query("topic"))
-	if topic == "merchant_order" {
+	// Prioriza o tipo que vem no Body (Webhook moderno)
+	topic := strings.TrimSpace(payload.Type)
+	if topic == "" {
+		topic = strings.TrimSpace(ctx.Query("topic"))
+	}
+	if topic == "" {
+		topic = strings.TrimSpace(ctx.Query("type"))
+	}
+	action := strings.TrimSpace(payload.Action)
+
+	// Ignora notificações que não sejam de pagamento ou ordens intermediárias
+	if topic == "merchant_order" || strings.HasPrefix(action, "merchant_order") {
 		ctx.JSON(http.StatusOK, gin.H{"status": "ignorado"})
 		return
 	}
 
-	paymentIDStr := strings.TrimSpace(ctx.Query("data.id"))
-	if paymentIDStr == "" {
-		paymentIDStr = strings.TrimSpace(ctx.Query("id"))
+	isPayment := topic == "payment" || strings.HasPrefix(action, "payment.")
+	if !isPayment {
+		ctx.JSON(http.StatusOK, gin.H{"status": "ignorado", "motivo": "não é evento de pagamento"})
+		return
+	}
+
+	// Extração segura do ID do pagamento
+	var paymentIDStr string
+	if payload.Data.ID != nil {
+		paymentIDStr = strings.TrimSpace(fmt.Sprintf("%v", payload.Data.ID))
+	}
+	if paymentIDStr == "" || paymentIDStr == "<nil>" {
+		paymentIDStr = strings.TrimSpace(ctx.Query("data.id"))
 	}
 	if paymentIDStr == "" {
-		paymentIDStr = strings.TrimSpace(payload.Data.ID)
+		paymentIDStr = strings.TrimSpace(ctx.Query("id"))
 	}
 
 	if paymentIDStr == "" {
@@ -133,55 +150,24 @@ func (c *PagamentoController) HandleWebhook(ctx *gin.Context) {
 
 	paymentID, err := strconv.Atoi(paymentIDStr)
 	if err != nil {
-		if topic != "" {
-			ctx.JSON(http.StatusOK, gin.H{"status": "ignorado"})
-			return
-		}
-		audit.GetLogger().LogEvent("pagamento_webhook", false, map[string]any{
-			"payment_id": paymentIDStr,
-		}, err)
+		audit.GetLogger().LogEvent("pagamento_webhook", false, map[string]any{"payment_id": paymentIDStr}, err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "payment id inválido"})
 		return
 	}
 
 	result, err := c.payService.ProcessarPagamentoWebhook(ctx, paymentID)
 	if err != nil {
-		audit.GetLogger().LogEvent("pagamento_webhook", false, map[string]any{
-			"payment_id":        paymentID,
-			"ticket_usuario_id": result.TicketUsuarioID,
-			"usuario_id":        result.UsuarioID,
-			"ticket_id":         result.TicketID,
-			"cpf":               result.CPF,
-			"status":            result.Status,
-		}, err)
-		if errors.Is(err, service.ErrExternalReferenceInvalida) {
-			ctx.JSON(http.StatusBadRequest, gin.H{"erro": "external_reference inválida"})
-			return
-		}
-		if errors.Is(err, repository.ErrNotFound) {
-			ctx.JSON(http.StatusNotFound, gin.H{"erro": "ticket do usuario não encontrado"})
-			return
-		}
-		if errors.Is(err, repository.ErrTicketIndisponivel) {
-			ctx.JSON(http.StatusConflict, gin.H{"erro": "ticket indisponivel"})
-			return
-		}
-		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao registrar pagamento"})
+		audit.GetLogger().LogEvent("pagamento_webhook", false, map[string]any{"payment_id": paymentID}, err)
+		// Retornamos 200 para o MP parar de tentar se for um erro de negócio (not found, etc)
+		ctx.JSON(http.StatusOK, gin.H{"status": "erro_ignorado", "erro": err.Error()})
 		return
 	}
 
 	sucesso := result.Status == "ok" || result.Status == "duplicado"
-	var logErr error
-	if !sucesso {
-		logErr = fmt.Errorf("status=%s", result.Status)
-	}
 	audit.GetLogger().LogEvent("pagamento_webhook", sucesso, map[string]any{
-		"payment_id":        paymentID,
-		"ticket_usuario_id": result.TicketUsuarioID,
-		"usuario_id":        result.UsuarioID,
-		"ticket_id":         result.TicketID,
-		"cpf":               result.CPF,
-		"status":            result.Status,
-	}, logErr)
+		"payment_id": paymentID,
+		"status":     result.Status,
+	}, nil)
+	
 	ctx.JSON(http.StatusOK, gin.H{"status": result.Status})
 }

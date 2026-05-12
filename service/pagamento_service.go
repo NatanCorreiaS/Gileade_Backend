@@ -48,7 +48,6 @@ type PagamentoService struct {
 	gw      *gateway.MercadoPagoGateway
 }
 
-// NewPagamentoService monta o service de pagamentos.
 func NewPagamentoService(db *gorm.DB, gw *gateway.MercadoPagoGateway) *PagamentoService {
 	return &PagamentoService{
 		pRepo:   repository.NewPessoaRepository(db),
@@ -93,6 +92,15 @@ func (s *PagamentoService) CriarCheckout(ctx context.Context, req CheckoutReques
 				Quantity:    1,
 			},
 		},
+		// Configuração do Payer obrigatória para Cartões de Crédito e Testes de Cenário
+		Payer: &preference.PayerRequest{
+			Name:  pessoa.Nome, // Para testes, altere no banco para 'APRO', 'FUND', etc.
+			Email: pessoa.Email,
+			Identification: &preference.IdentificationRequest{
+				Type:   "CPF",
+				Number: "12345678909", // CPF de teste padrão da documentação
+			},
+		},
 		ExternalReference: fmt.Sprintf("%d", tu.ID),
 		BinaryMode:        true,
 		Metadata: map[string]any{
@@ -109,6 +117,7 @@ func (s *PagamentoService) CriarCheckout(ctx context.Context, req CheckoutReques
 			Pending: req.PendingURL,
 		}
 	}
+	
 	if req.SuccessURL != "" {
 		prefReq.AutoReturn = "approved"
 	}
@@ -128,6 +137,7 @@ func (s *PagamentoService) CriarCheckout(ctx context.Context, req CheckoutReques
 		_ = s.tuRepo.Delete(ctx, tu.ID)
 		return CheckoutResponse{}, err
 	}
+	
 	if err := s.tuRepo.UpdatePreferenceID(ctx, tu.ID, prefResp.ID); err != nil {
 		return CheckoutResponse{}, err
 	}
@@ -138,53 +148,6 @@ func (s *PagamentoService) CriarCheckout(ctx context.Context, req CheckoutReques
 		SandboxInit:     prefResp.SandboxInitPoint,
 		TicketUsuarioID: tu.ID,
 	}, nil
-}
-
-type ConfirmacaoPagamento struct {
-	Status    string
-	Duplicado bool
-}
-
-// ConfirmarPagamento valida o pagamento no gateway e registra no banco.
-func (s *PagamentoService) ConfirmarPagamento(ctx context.Context, ticketUsuarioID uint64, paymentID int) (ConfirmacaoPagamento, error) {
-	payResp, err := s.gw.GetPayment(ctx, paymentID)
-	if err != nil {
-		return ConfirmacaoPagamento{}, err
-	}
-
-	if payResp.Status != "approved" {
-		return ConfirmacaoPagamento{Status: payResp.Status}, nil
-	}
-
-	if payResp.ExternalReference != fmt.Sprintf("%d", ticketUsuarioID) {
-		return ConfirmacaoPagamento{}, fmt.Errorf("external_reference divergente")
-	}
-
-	if _, err := s.tuRepo.GetByID(ctx, ticketUsuarioID); err != nil {
-		return ConfirmacaoPagamento{}, err
-	}
-
-	dataPagamento := time.Now().UTC()
-	if !payResp.DateApproved.IsZero() {
-		dataPagamento = payResp.DateApproved
-	}
-
-	pagamento := model.Pagamento{
-		IDTransacao:      fmt.Sprintf("%d", payResp.ID),
-		Valor:            decimal.NewFromFloat(payResp.TransactionAmount),
-		TicketsUsuarioID: ticketUsuarioID,
-		Metodo:           mapMetodoPagamento(payResp.PaymentTypeID),
-		DataPagamento:    dataPagamento,
-	}
-
-	if err := s.payRepo.CreateAndMarkTicketPago(ctx, &pagamento); err != nil {
-		if isUniqueViolation(err) {
-			return ConfirmacaoPagamento{Status: "duplicado", Duplicado: true}, nil
-		}
-		return ConfirmacaoPagamento{}, err
-	}
-
-	return ConfirmacaoPagamento{Status: "ok"}, nil
 }
 
 type WebhookResultado struct {
@@ -203,6 +166,8 @@ func (s *PagamentoService) ProcessarPagamentoWebhook(ctx context.Context, paymen
 	}
 
 	result := WebhookResultado{Status: payResp.Status}
+	
+	// Se o status for rejeitado ou outro que não seja aprovado, apenas retornamos o status
 	if payResp.Status != "approved" {
 		return result, nil
 	}
@@ -216,6 +181,7 @@ func (s *PagamentoService) ProcessarPagamentoWebhook(ctx context.Context, paymen
 	if err != nil {
 		return WebhookResultado{}, err
 	}
+	
 	result.TicketUsuarioID = tu.ID
 	result.UsuarioID = tu.UsuarioID
 	result.TicketID = tu.TicketID
@@ -250,12 +216,10 @@ func (s *PagamentoService) ProcessarPagamentoWebhook(ctx context.Context, paymen
 	return result, nil
 }
 
-// SearchPayments consulta pagamentos no gateway por filtros.
 func (s *PagamentoService) SearchPayments(ctx context.Context, req payment.SearchRequest) (*payment.SearchResponse, error) {
 	return s.gw.SearchPayments(ctx, req)
 }
 
-// CriarEstornoPorPagamentoID realiza estorno com base no ID interno.
 func (s *PagamentoService) CriarEstornoPorPagamentoID(ctx context.Context, pagamentoID uint64, motivo string, valor *decimal.Decimal) (model.Estorno, error) {
 	pagamento, err := s.payRepo.GetByID(ctx, pagamentoID)
 	if err != nil {
@@ -295,7 +259,6 @@ func (s *PagamentoService) CriarEstornoPorPagamentoID(ctx context.Context, pagam
 	return estorno, nil
 }
 
-// CriarEstornoPorPaymentID realiza estorno com base no ID do gateway.
 func (s *PagamentoService) CriarEstornoPorPaymentID(ctx context.Context, paymentID int, motivo string, valor *decimal.Decimal) (model.Estorno, error) {
 	pagamento, err := s.payRepo.GetByIDTransacao(ctx, fmt.Sprintf("%d", paymentID))
 	if err != nil {
@@ -330,7 +293,6 @@ func (s *PagamentoService) CriarEstornoPorPaymentID(ctx context.Context, payment
 	return estorno, nil
 }
 
-// criarRefund escolhe estorno total ou parcial.
 func (s *PagamentoService) criarRefund(ctx context.Context, paymentID int, valor *decimal.Decimal) (*refund.Response, error) {
 	if valor != nil {
 		floatVal, _ := valor.Float64()
@@ -339,7 +301,6 @@ func (s *PagamentoService) criarRefund(ctx context.Context, paymentID int, valor
 	return s.gw.CreateRefund(ctx, paymentID)
 }
 
-// mapMetodoPagamento converte o tipo do gateway para o enum interno.
 func mapMetodoPagamento(paymentTypeID string) model.MetodoPagamento {
 	switch paymentTypeID {
 	case "credit_card", "debit_card":
@@ -353,7 +314,6 @@ func mapMetodoPagamento(paymentTypeID string) model.MetodoPagamento {
 	}
 }
 
-// isUniqueViolation detecta violacao de unique constraint do Postgres.
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) {

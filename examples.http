@@ -5,16 +5,16 @@ POST {{base}}/pessoas
 Content-Type: application/json
 
 {
-	"nome": "Sigma da Silva",
+	"nome": "Sicrano da Silva",
 	"tipo_usuario": "Usuario",
 	"senha": "hash_da_senha",
-	"cpf": "123.456.789-00",
+	"cpf": "333.821.777-00",
 	"idade": 29,
 	"igreja": "Igreja Central",
 	"papel_igreja": "Membro",
 	"estado_civil": "Solteiro(a)",
-	"email": "sigma@exemplo.com",
-	"sexo": "Feminino",
+	"email": "sicrano@exemplo.com",
+	"sexo": "Masculino",
 	"cidade": "Sao Paulo",
 	"estado_uf": "SP",
 	"escolaridade": "Ensino Superior Completo"
@@ -73,7 +73,7 @@ POST {{base}}/tickets-usuario
 Content-Type: application/json
 
 {
-	"usuario_id": 4,
+	"usuario_id": 6,
 	"ticket_id": 2,
 	"status": "Pendente"
 }
@@ -82,7 +82,7 @@ Content-Type: application/json
 GET {{base}}/tickets-usuario/1
 
 ### Tickets-usuario - listar por usuario
-GET {{base}}/usuarios/4/tickets?limit=50&offset=0
+GET {{base}}/usuarios/6/tickets?limit=50&offset=0
 
 ### Tickets-usuario - atualizar status
 PATCH {{base}}/tickets-usuario/1/status
@@ -100,7 +100,7 @@ POST {{base}}/pagamentos/checkout
 Content-Type: application/json
 
 {
-	"usuario_id": 4,
+	"usuario_id": 6,
 	"ticket_id": 2,
 	"success_url": "https://seu-site.com/checkout/sucesso",
 	"failure_url": "https://seu-site.com/checkout/erro",
