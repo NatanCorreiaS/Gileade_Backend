@@ -1,8 +1,10 @@
 package controller
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -105,10 +107,37 @@ func (c *PagamentoController) CreateCheckout(ctx *gin.Context) {
 }
 
 func (c *PagamentoController) HandleWebhook(ctx *gin.Context) {
+	// 1. Ler o body bruto para registrar exatamente o que o Mercado Pago mandou
+	bodyBytes, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		audit.GetLogger().LogEvent("pagamento_webhook_erro_leitura", false, nil, err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "falha ao ler body"})
+		return
+	}
+
+	// 2. Restaurar o body para o Gin conseguir fazer o ShouldBindJSON
+	ctx.Request.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	// 3. Capturar headers para analisar as assinaturas x-signature
+	headersObj := make(map[string]any)
+	for k, v := range ctx.Request.Header {
+		if len(v) == 1 {
+			headersObj[k] = v[0]
+		} else {
+			headersObj[k] = v
+		}
+	}
+
+	// Registra log detalhado
+	audit.GetLogger().LogEvent("pagamento_webhook_recebido", true, map[string]any{
+		"body":    string(bodyBytes),
+		"headers": headersObj,
+		"query":   ctx.Request.URL.RawQuery,
+	}, nil)
+
 	var payload WebhookPayload
 	_ = ctx.ShouldBindJSON(&payload)
 
-	// Prioriza o tipo que vem no Body (Webhook moderno)
 	topic := strings.TrimSpace(payload.Type)
 	if topic == "" {
 		topic = strings.TrimSpace(ctx.Query("topic"))
@@ -118,7 +147,6 @@ func (c *PagamentoController) HandleWebhook(ctx *gin.Context) {
 	}
 	action := strings.TrimSpace(payload.Action)
 
-	// Ignora notificações que não sejam de pagamento ou ordens intermediárias
 	if topic == "merchant_order" || strings.HasPrefix(action, "merchant_order") {
 		ctx.JSON(http.StatusOK, gin.H{"status": "ignorado"})
 		return
@@ -130,7 +158,6 @@ func (c *PagamentoController) HandleWebhook(ctx *gin.Context) {
 		return
 	}
 
-	// Extração segura do ID do pagamento
 	var paymentIDStr string
 	if payload.Data.ID != nil {
 		paymentIDStr = strings.TrimSpace(fmt.Sprintf("%v", payload.Data.ID))
@@ -158,7 +185,6 @@ func (c *PagamentoController) HandleWebhook(ctx *gin.Context) {
 	result, err := c.payService.ProcessarPagamentoWebhook(ctx, paymentID)
 	if err != nil {
 		audit.GetLogger().LogEvent("pagamento_webhook", false, map[string]any{"payment_id": paymentID}, err)
-		// Retornamos 200 para o MP parar de tentar se for um erro de negócio (not found, etc)
 		ctx.JSON(http.StatusOK, gin.H{"status": "erro_ignorado", "erro": err.Error()})
 		return
 	}
@@ -168,6 +194,6 @@ func (c *PagamentoController) HandleWebhook(ctx *gin.Context) {
 		"payment_id": paymentID,
 		"status":     result.Status,
 	}, nil)
-	
+
 	ctx.JSON(http.StatusOK, gin.H{"status": result.Status})
 }

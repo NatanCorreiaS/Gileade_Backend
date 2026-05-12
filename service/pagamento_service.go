@@ -94,11 +94,12 @@ func (s *PagamentoService) CriarCheckout(ctx context.Context, req CheckoutReques
 		},
 		// Configuração do Payer obrigatória para Cartões de Crédito e Testes de Cenário
 		Payer: &preference.PayerRequest{
-			Name:  pessoa.Nome, // Para testes, altere no banco para 'APRO', 'FUND', etc.
-			Email: pessoa.Email,
+			Name:    pessoa.Nome, // Para testes, altere no banco para 'APRO', 'FUND', etc.
+			Surname: pessoa.Nome, // ADICIONADO: O Mercado Pago costuma rejeitar cartões sem sobrenome
+			Email:   pessoa.Email,
 			Identification: &preference.IdentificationRequest{
 				Type:   "CPF",
-				Number: "12345678909", // CPF de teste padrão da documentação
+				Number: pessoa.CPF, // CORRIGIDO: Agora usa o CPF dinâmico. Para testar, cadastre a Pessoa com o CPF 12345678909
 			},
 		},
 		ExternalReference: fmt.Sprintf("%d", tu.ID),
@@ -117,7 +118,7 @@ func (s *PagamentoService) CriarCheckout(ctx context.Context, req CheckoutReques
 			Pending: req.PendingURL,
 		}
 	}
-	
+
 	if req.SuccessURL != "" {
 		prefReq.AutoReturn = "approved"
 	}
@@ -137,7 +138,7 @@ func (s *PagamentoService) CriarCheckout(ctx context.Context, req CheckoutReques
 		_ = s.tuRepo.Delete(ctx, tu.ID)
 		return CheckoutResponse{}, err
 	}
-	
+
 	if err := s.tuRepo.UpdatePreferenceID(ctx, tu.ID, prefResp.ID); err != nil {
 		return CheckoutResponse{}, err
 	}
@@ -166,7 +167,7 @@ func (s *PagamentoService) ProcessarPagamentoWebhook(ctx context.Context, paymen
 	}
 
 	result := WebhookResultado{Status: payResp.Status}
-	
+
 	// Se o status for rejeitado ou outro que não seja aprovado, apenas retornamos o status
 	if payResp.Status != "approved" {
 		return result, nil
@@ -181,7 +182,7 @@ func (s *PagamentoService) ProcessarPagamentoWebhook(ctx context.Context, paymen
 	if err != nil {
 		return WebhookResultado{}, err
 	}
-	
+
 	result.TicketUsuarioID = tu.ID
 	result.UsuarioID = tu.UsuarioID
 	result.TicketID = tu.TicketID
