@@ -1,6 +1,7 @@
 ## Endpoints
 
 Base URL (dev): `http://localhost:8080`
+**ENDPOINT PUBLICO PARA TESTES**: `https://gileadebackend-production.up.railway.app`
 
 ### Criar Checkout Pro
 
