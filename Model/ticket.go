@@ -11,6 +11,8 @@ import (
 type Ticket struct {
 	ID uint64 `gorm:"primaryKey;autoIncrement" json:"id"`
 
+	Tipo TipoTicket `gorm:"type:text;not null" json:"tipo"`
+
 	Nome      string          `gorm:"type:text;not null" json:"nome"`
 	Descricao string          `gorm:"type:text" json:"descricao"`
 	Preco     decimal.Decimal `gorm:"type:numeric(18,2);not null" json:"preco"`
@@ -21,7 +23,7 @@ type Ticket struct {
 	DataCriacao     time.Time `gorm:"autoCreateTime" json:"data_criacao"`
 	DataAtualizacao time.Time `gorm:"autoUpdateTime" json:"data_atualizacao"`
 
-	TicketsUsuario []TicketUsuario `gorm:"foreignKey:TicketID" json:"tickets_usuario,omitempty"`
+	TicketsCompra []TicketCompra `gorm:"foreignKey:TicketID" json:"tickets_compra,omitempty"`
 }
 
 // TableName define o nome da tabela para Ticket.

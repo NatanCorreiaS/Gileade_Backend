@@ -22,7 +22,7 @@ func NewRouter(deps AppDeps) *gin.Engine {
 	api := r.Group("/api/v1")
 	controller.NewPessoaController(deps.DB).RegisterRoutes(api)
 	controller.NewTicketController(deps.DB).RegisterRoutes(api)
-	controller.NewTicketUsuarioController(deps.DB).RegisterRoutes(api)
+	controller.NewTicketCompraController(deps.DB).RegisterRoutes(api)
 	controller.NewPagamentoController(deps.DB, deps.MP).RegisterRoutes(api)
 	controller.NewEstornoController(deps.DB, deps.MP).RegisterRoutes(api)
 

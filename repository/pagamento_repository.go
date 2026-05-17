@@ -26,7 +26,7 @@ func (r *PagamentoRepository) Create(ctx context.Context, pagamento *model.Pagam
 func (r *PagamentoRepository) GetByID(ctx context.Context, id uint64) (model.Pagamento, error) {
 	var pagamento model.Pagamento
 	err := r.db.WithContext(ctx).
-		Preload("TicketsUsuario").
+		Preload("TicketCompra").
 		First(&pagamento, id).Error
 	return pagamento, mapGormErr(err)
 }
@@ -40,8 +40,8 @@ func (r *PagamentoRepository) GetByIDTransacao(ctx context.Context, idTransacao 
 	return pagamento, mapGormErr(err)
 }
 
-// ListByTicketsUsuarioID lista pagamentos por ticket_usuario.
-func (r *PagamentoRepository) ListByTicketsUsuarioID(ctx context.Context, ticketsUsuarioID uint64, limit, offset int) ([]model.Pagamento, error) {
+// ListByTicketCompraID lista pagamentos por ticket_compra.
+func (r *PagamentoRepository) ListByTicketCompraID(ctx context.Context, ticketCompraID uint64, limit, offset int) ([]model.Pagamento, error) {
 	if limit <= 0 {
 		limit = 50
 	}
@@ -51,7 +51,7 @@ func (r *PagamentoRepository) ListByTicketsUsuarioID(ctx context.Context, ticket
 
 	var pagamentos []model.Pagamento
 	err := r.db.WithContext(ctx).
-		Where("tickets_usuario_id = ?", ticketsUsuarioID).
+		Where("ticket_compra_id = ?", ticketCompraID).
 		Order("id asc").
 		Limit(limit).
 		Offset(offset).
@@ -69,7 +69,7 @@ func (r *PagamentoRepository) Delete(ctx context.Context, id uint64) error {
 	return mapGormErr(r.db.WithContext(ctx).Delete(&model.Pagamento{}, id).Error)
 }
 
-// CreateAndMarkTicketPago cria um pagamento e marca o TicketUsuario como Pago na mesma transação.
+// CreateAndMarkTicketPago cria um pagamento e marca o TicketCompra como Pago na mesma transação.
 // Use quando o estado do ticket não pode divergir do registro de pagamento.
 func (r *PagamentoRepository) CreateAndMarkTicketPago(ctx context.Context, pagamento *model.Pagamento) error {
 	return mapGormErr(r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -77,14 +77,24 @@ func (r *PagamentoRepository) CreateAndMarkTicketPago(ctx context.Context, pagam
 			return err
 		}
 
-		var tu model.TicketUsuario
-		if err := tx.Select("id", "ticket_id").First(&tu, pagamento.TicketsUsuarioID).Error; err != nil {
+		var tc model.TicketCompra
+		if err := tx.Preload("Ticket").First(&tc, pagamento.TicketCompraID).Error; err != nil {
 			return err
 		}
 
+		unidadesPorTicket, err := unidadesPorTicket(tc.Ticket.Tipo)
+		if err != nil {
+			return err
+		}
+		quantidade := tc.Quantidade
+		if quantidade == 0 {
+			quantidade = 1
+		}
+		quantidadeTotal := unidadesPorTicket * quantidade
+
 		res := tx.Model(&model.Ticket{}).
-			Where("id = ? AND quantidade_disponivel > 0", tu.TicketID).
-			Update("quantidade_disponivel", gorm.Expr("quantidade_disponivel - 1"))
+			Where("id = ? AND quantidade_disponivel >= ?", tc.TicketID, quantidadeTotal).
+			Update("quantidade_disponivel", gorm.Expr("quantidade_disponivel - ?", quantidadeTotal))
 		if res.Error != nil {
 			return res.Error
 		}
@@ -92,8 +102,8 @@ func (r *PagamentoRepository) CreateAndMarkTicketPago(ctx context.Context, pagam
 			return ErrTicketIndisponivel
 		}
 
-		res = tx.Model(&model.TicketUsuario{}).
-			Where("id = ?", pagamento.TicketsUsuarioID).
+		res = tx.Model(&model.TicketCompra{}).
+			Where("id = ?", pagamento.TicketCompraID).
 			Update("status", model.TicketsStatusPago)
 		if res.Error != nil {
 			return res.Error
@@ -103,4 +113,17 @@ func (r *PagamentoRepository) CreateAndMarkTicketPago(ctx context.Context, pagam
 		}
 		return nil
 	}))
+}
+
+func unidadesPorTicket(tipo model.TipoTicket) (uint64, error) {
+	switch tipo {
+	case model.TipoTicketIndividual, "":
+		return 1, nil
+	case model.TipoTicketDuo:
+		return 2, nil
+	case model.TipoTicketCaravana:
+		return 10, nil
+	default:
+		return 0, ErrTipoTicketInvalido
+	}
 }

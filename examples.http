@@ -1,4 +1,5 @@
 @base = https://unbitten-crescent-hut.ngrok-free.dev/api/v1
+@public = https://gileadebackend-production.up.railway.app/api/v1
 
 ### Pessoas - criar
 POST {{base}}/pessoas
@@ -20,8 +21,34 @@ Content-Type: application/json
 	"escolaridade": "Ensino Superior Completo"
 }
 
+###
+POST {{public}}/pessoas
+Content-Type: application/json
+
+{
+	"nome": "APRO",
+	"tipo_usuario": "Usuario",
+	"senha": "hash_da_senha",
+	"cpf": "12345678909",
+	"idade": 29,
+	"igreja": "Igreja Central",
+	"papel_igreja": "Membro",
+	"estado_civil": "Solteiro(a)",
+	"email": "apro@exemplo.com",
+	"sexo": "Masculino",
+	"cidade": "Sao Paulo",
+	"estado_uf": "SP",
+	"escolaridade": "Ensino Superior Completo"
+}
+
+
+
 ### Pessoas - listar
 GET {{base}}/pessoas?limit=50&offset=0
+
+###
+GET {{public}}/pessoas?limit=50&offset=0
+
 
 ### Pessoas - buscar por ID
 GET {{base}}/pessoas/1
@@ -43,15 +70,33 @@ POST {{base}}/tickets
 Content-Type: application/json
 
 {
+	"tipo": "Individual",
 	"nome": "Ingresso Geral",
 	"descricao": "Entrada padrao",
 	"preco": "120.00",
 	"quantidade_disponivel": 100,
 	"data_evento": "2026-10-20"
 }
+###
+
+POST {{public}}/tickets
+Content-Type: application/json
+
+{
+	"tipo": "Individual",
+	"nome": "Ingresso Geral",
+	"descricao": "Entrada padrao",
+	"preco": "200.00",
+	"quantidade_disponivel": 100,
+	"data_evento": "2026-10-20"
+}
 
 ### Tickets - listar
 GET {{base}}/tickets?limit=50&offset=0
+
+###
+GET {{public}}/tickets?limit=50&offset=0
+
 
 ### Tickets - buscar por ID
 GET {{base}}/tickets/1
@@ -68,32 +113,36 @@ Content-Type: application/json
 ### Tickets - remover
 DELETE {{base}}/tickets/1
 
-### Tickets-usuario - criar vinculo
-POST {{base}}/tickets-usuario
+### Tickets-compra - criar vinculo
+POST {{base}}/tickets-compra
 Content-Type: application/json
 
 {
 	"usuario_id": 8,
 	"ticket_id": 2,
+	"quantidade": 1,
 	"status": "Pendente"
 }
 
-### Tickets-usuario - buscar por ID
-GET {{base}}/tickets-usuario/1
+### Tickets-compra - buscar por ID
+GET {{base}}/tickets-compra/1
 
-### Tickets-usuario - listar por usuario
-GET {{base}}/usuarios/8/tickets?limit=50&offset=0
+### Tickets-compra - listar por usuario
+GET {{base}}/usuarios/8/tickets-compra?limit=50&offset=0
 
-### Tickets-usuario - atualizar status
-PATCH {{base}}/tickets-usuario/1/status
+###
+GET {{public}}/usuarios/1/tickets-compra?limit=50&offset=0
+
+### Tickets-compra - atualizar status
+PATCH {{base}}/tickets-compra/1/status
 Content-Type: application/json
 
 {
 	"status": "Pago"
 }
 
-### Tickets-usuario - remover
-DELETE {{base}}/tickets-usuario/1
+### Tickets-compra - remover
+DELETE {{base}}/tickets-compra/1
 
 ### Pagamentos - checkout (gateway via service)
 POST {{base}}/pagamentos/checkout
@@ -102,11 +151,25 @@ Content-Type: application/json
 {
 	"usuario_id": 8,
 	"ticket_id": 2,
+	"quantidade": 2,
 	"success_url": "https://seu-site.com/checkout/sucesso",
 	"failure_url": "https://seu-site.com/checkout/erro",
-	"pending_url": "https://seu-site.com/checkout/pendente",
-	"notification_url": "{{base}}/pagamentos/webhook"
+	"pending_url": "https://seu-site.com/checkout/pendente"
 }
+
+###
+POST {{public}}/pagamentos/checkout
+Content-Type: application/json
+
+{
+	"usuario_id": 1,
+	"ticket_id": 2,
+	"quantidade": 2,
+	"success_url": "https://seu-site.com/checkout/sucesso",
+	"failure_url": "https://seu-site.com/checkout/erro",
+	"pending_url": "https://seu-site.com/checkout/pendente"
+}
+
 
 ### Pagamentos - webhook (body)
 POST {{base}}/pagamentos/webhook

@@ -23,28 +23,31 @@ func NewTicketController(db *gorm.DB) *TicketController {
 }
 
 type TicketCreateRequest struct {
-	Nome                 string `json:"nome" binding:"required"`
-	Descricao            string `json:"descricao"`
-	Preco                string `json:"preco" binding:"required"`
-	QuantidadeDisponivel uint64 `json:"quantidade_disponivel" binding:"required"`
-	DataEvento           string `json:"data_evento" binding:"required"`
+	Tipo                 model.TipoTicket `json:"tipo" binding:"required"`
+	Nome                 string           `json:"nome" binding:"required"`
+	Descricao            string           `json:"descricao"`
+	Preco                string           `json:"preco" binding:"required"`
+	QuantidadeDisponivel uint64           `json:"quantidade_disponivel" binding:"required"`
+	DataEvento           string           `json:"data_evento" binding:"required"`
 }
 
 type TicketUpdateRequest struct {
-	Nome                 *string `json:"nome"`
-	Descricao            *string `json:"descricao"`
-	Preco                *string `json:"preco"`
-	QuantidadeDisponivel *uint64 `json:"quantidade_disponivel"`
-	DataEvento           *string `json:"data_evento"`
+	Tipo                 *model.TipoTicket `json:"tipo"`
+	Nome                 *string           `json:"nome"`
+	Descricao            *string           `json:"descricao"`
+	Preco                *string           `json:"preco"`
+	QuantidadeDisponivel *uint64           `json:"quantidade_disponivel"`
+	DataEvento           *string           `json:"data_evento"`
 }
 
 type TicketResponse struct {
-	ID                   uint64          `json:"id"`
-	Nome                 string          `json:"nome"`
-	Descricao            string          `json:"descricao"`
-	Preco                decimal.Decimal `json:"preco"`
-	QuantidadeDisponivel uint64          `json:"quantidade_disponivel"`
-	DataEvento           string          `json:"data_evento"`
+	ID                   uint64           `json:"id"`
+	Tipo                 model.TipoTicket `json:"tipo"`
+	Nome                 string           `json:"nome"`
+	Descricao            string           `json:"descricao"`
+	Preco                decimal.Decimal  `json:"preco"`
+	QuantidadeDisponivel uint64           `json:"quantidade_disponivel"`
+	DataEvento           string           `json:"data_evento"`
 }
 
 // RegisterRoutes registra os endpoints de tickets.
@@ -86,6 +89,7 @@ func (c *TicketController) Create(ctx *gin.Context) {
 	}
 
 	ticket := model.Ticket{
+		Tipo:                 req.Tipo,
 		Nome:                 req.Nome,
 		Descricao:            req.Descricao,
 		Preco:                preco,
@@ -182,6 +186,9 @@ func (c *TicketController) Update(ctx *gin.Context) {
 	if req.Nome != nil {
 		ticket.Nome = *req.Nome
 	}
+	if req.Tipo != nil {
+		ticket.Tipo = *req.Tipo
+	}
 	if req.Descricao != nil {
 		ticket.Descricao = *req.Descricao
 	}
@@ -251,6 +258,7 @@ func (c *TicketController) Delete(ctx *gin.Context) {
 func toTicketResponse(t model.Ticket) TicketResponse {
 	return TicketResponse{
 		ID:                   t.ID,
+		Tipo:                 t.Tipo,
 		Nome:                 t.Nome,
 		Descricao:            t.Descricao,
 		Preco:                t.Preco,

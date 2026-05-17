@@ -14,8 +14,8 @@ type Pagamento struct {
 	IDTransacao string          `gorm:"type:text;not null;uniqueIndex" json:"id_transacao"`
 	Valor       decimal.Decimal `gorm:"type:numeric(18,2);not null" json:"valor"`
 
-	TicketsUsuarioID uint64        `gorm:"type:bigint;not null;index" json:"id_tickets_usuario"`
-	TicketsUsuario   TicketUsuario `gorm:"foreignKey:TicketsUsuarioID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"tickets_usuario"`
+	TicketCompraID uint64       `gorm:"type:bigint;not null;index" json:"id_ticket_compra"`
+	TicketCompra   TicketCompra `gorm:"foreignKey:TicketCompraID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"ticket_compra"`
 
 	Metodo        MetodoPagamento `gorm:"type:text;not null" json:"metodo"`
 	DataPagamento time.Time       `gorm:"type:timestamp;not null" json:"data_pagamento"`

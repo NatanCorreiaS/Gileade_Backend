@@ -33,7 +33,7 @@ type Pessoa struct {
 	DataCriacao     time.Time `gorm:"autoCreateTime" json:"data_criacao"`
 	DataAtualizacao time.Time `gorm:"autoUpdateTime" json:"data_atualizacao"`
 
-	TicketsUsuario []TicketUsuario `gorm:"foreignKey:UsuarioID" json:"tickets_usuario,omitempty"`
+	TicketsCompra []TicketCompra `gorm:"foreignKey:UsuarioID" json:"tickets_compra,omitempty"`
 }
 
 // TableName define o nome da tabela para Pessoa.

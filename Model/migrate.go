@@ -8,7 +8,10 @@ func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&Pessoa{},
 		&Ticket{},
-		&TicketUsuario{},
+		&TicketCompra{},
+		&TicketIndividual{},
+		&TicketDuo{},
+		&TicketCaravana{},
 		&Pagamento{},
 		&Estorno{},
 	)

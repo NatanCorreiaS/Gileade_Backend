@@ -1,0 +1,181 @@
+@base = https://unbitten-crescent-hut.ngrok-free.dev/api/v1
+
+### Pessoas - criar
+POST {{base}}/pessoas
+Content-Type: application/json
+
+{
+	"nome": "Comprador Teste",
+	"tipo_usuario": "Usuario",
+	"senha": "hash_da_senha",
+	"cpf": "11111111111",
+	"idade": 29,
+	"igreja": "Igreja Central",
+	"papel_igreja": "Membro",
+	"estado_civil": "Solteiro(a)",
+	"email": "comprador.teste@exemplo.com",
+	"sexo": "Masculino",
+	"cidade": "Sao Paulo",
+	"estado_uf": "SP",
+	"escolaridade": "Ensino Superior Completo"
+}
+
+### Tickets - criar Individual
+POST {{base}}/tickets
+Content-Type: application/json
+
+{
+	"tipo": "Individual",
+	"nome": "Ingresso Individual",
+	"descricao": "Entrada individual",
+	"preco": "120.00",
+	"quantidade_disponivel": 100,
+	"data_evento": "2026-10-20"
+}
+
+### Tickets - criar Duo
+POST {{base}}/tickets
+Content-Type: application/json
+
+{
+	"tipo": "Duo",
+	"nome": "Ingresso Duo",
+	"descricao": "Entrada para duas pessoas",
+	"preco": "220.00",
+	"quantidade_disponivel": 50,
+	"data_evento": "2026-10-20"
+}
+
+### Tickets - criar Caravana
+POST {{base}}/tickets
+Content-Type: application/json
+
+{
+	"tipo": "Caravana",
+	"nome": "Ingresso Caravana",
+	"descricao": "Entrada para grupo",
+	"preco": "900.00",
+	"quantidade_disponivel": 20,
+	"data_evento": "2026-10-20"
+}
+
+### Pagamentos - checkout Individual (quantidade 1)
+POST {{base}}/pagamentos/checkout
+Content-Type: application/json
+
+{
+	"usuario_id": 1,
+	"ticket_id": 1,
+	"quantidade": 1,
+	"cpf_beneficiados": [
+		"11111111111"
+	],
+	"success_url": "https://seu-site.com/checkout/sucesso",
+	"failure_url": "https://seu-site.com/checkout/erro",
+	"pending_url": "https://seu-site.com/checkout/pendente"
+}
+
+### Pagamentos - checkout Duo (quantidade 1 = 2 beneficiados)
+POST {{base}}/pagamentos/checkout
+Content-Type: application/json
+
+{
+	"usuario_id": 1,
+	"ticket_id": 2,
+	"quantidade": 1,
+	"cpf_beneficiados": [
+		"11111111111",
+		"22222222222"
+	],
+	"success_url": "https://seu-site.com/checkout/sucesso",
+	"failure_url": "https://seu-site.com/checkout/erro",
+	"pending_url": "https://seu-site.com/checkout/pendente"
+}
+
+### Pagamentos - checkout Duo (quantidade 2 = 4 beneficiados)
+POST {{base}}/pagamentos/checkout
+Content-Type: application/json
+
+{
+	"usuario_id": 1,
+	"ticket_id": 2,
+	"quantidade": 2,
+	"cpf_beneficiados": [
+		"11111111111",
+		"22222222222",
+		"33333333333",
+		"44444444444"
+	],
+	"success_url": "https://seu-site.com/checkout/sucesso",
+	"failure_url": "https://seu-site.com/checkout/erro",
+	"pending_url": "https://seu-site.com/checkout/pendente"
+}
+
+### Pagamentos - checkout Caravana (quantidade 1 = 10 beneficiados)
+POST {{base}}/pagamentos/checkout
+Content-Type: application/json
+
+{
+	"usuario_id": 1,
+	"ticket_id": 3,
+	"quantidade": 1,
+	"cpf_beneficiados": [
+		"11111111111",
+		"22222222222",
+		"33333333333",
+		"44444444444",
+		"55555555555",
+		"66666666666",
+		"77777777777",
+		"88888888888",
+		"99999999999",
+		"00000000000"
+	],
+	"success_url": "https://seu-site.com/checkout/sucesso",
+	"failure_url": "https://seu-site.com/checkout/erro",
+	"pending_url": "https://seu-site.com/checkout/pendente"
+}
+
+### Pagamentos - webhook (body)
+POST {{base}}/pagamentos/webhook
+Content-Type: application/json
+
+{
+	"type": "payment",
+	"data": {
+		"id": "1234567890"
+	}
+}
+
+### Tickets-compra - listar por usuario (filtre por status no retorno)
+GET {{base}}/usuarios/1/tickets-compra?limit=50&offset=0
+
+### Tickets-compra - buscar por ID
+GET {{base}}/tickets-compra/1
+
+### Tickets-compra - atualizar status para Pago
+PATCH {{base}}/tickets-compra/1/status
+Content-Type: application/json
+
+{
+	"status": "Pago"
+}
+
+### Tickets-compra - atualizar status para Cancelado
+PATCH {{base}}/tickets-compra/1/status
+Content-Type: application/json
+
+{
+	"status": "Cancelado"
+}
+
+### Tickets-compra - atualizar status para Reembolsado
+PATCH {{base}}/tickets-compra/1/status
+Content-Type: application/json
+
+{
+	"status": "Reembolsado"
+}
+
+### Tickets-compra - remover
+DELETE {{base}}/tickets-compra/1

@@ -121,6 +121,7 @@ func TestTicketRepository(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ticket := model.Ticket{
+				Tipo:                 model.TipoTicketIndividual,
 				Nome:                 tc.nome,
 				Descricao:            "VIP",
 				Preco:                decimal.NewFromFloat(10.50),
@@ -171,8 +172,8 @@ func TestTicketRepository(t *testing.T) {
 	}
 }
 
-// TestTicketUsuarioRepository cobre operacoes basicas de ticket_usuario.
-func TestTicketUsuarioRepository(t *testing.T) {
+// TestTicketCompraRepository cobre operacoes basicas de ticket_compra.
+func TestTicketCompraRepository(t *testing.T) {
 	tdb := testutil.StartPostgres(t)
 	if err := model.AutoMigrate(tdb.DB); err != nil {
 		t.Fatalf("AutoMigrate: %v", err)
@@ -182,7 +183,7 @@ func TestTicketUsuarioRepository(t *testing.T) {
 
 	pRepo := repository.NewPessoaRepository(tdb.DB)
 	tRepo := repository.NewTicketRepository(tdb.DB)
-	tuRepo := repository.NewTicketUsuarioRepository(tdb.DB)
+	tcRepo := repository.NewTicketCompraRepository(tdb.DB)
 
 	cases := []struct {
 		name  string
@@ -211,6 +212,7 @@ func TestTicketUsuarioRepository(t *testing.T) {
 			}
 
 			ticket := model.Ticket{
+				Tipo:                 model.TipoTicketIndividual,
 				Nome:                 "Ingresso 2",
 				Descricao:            "Standard",
 				Preco:                decimal.NewFromFloat(5.00),
@@ -221,16 +223,17 @@ func TestTicketUsuarioRepository(t *testing.T) {
 				t.Fatalf("seed ticket: %v", err)
 			}
 
-			tu := model.TicketUsuario{
-				UsuarioID: pessoa.ID,
-				TicketID:  ticket.ID,
-				Status:    model.TicketsStatusPendente,
+			tc := model.TicketCompra{
+				UsuarioID:  pessoa.ID,
+				TicketID:   ticket.ID,
+				Quantidade: 1,
+				Status:     model.TicketsStatusPendente,
 			}
-			if err := tuRepo.Create(ctx, &tu); err != nil {
+			if err := tcRepo.Create(ctx, &tc); err != nil {
 				t.Fatalf("Create: %v", err)
 			}
 
-			got, err := tuRepo.GetByID(ctx, tu.ID)
+			got, err := tcRepo.GetByID(ctx, tc.ID)
 			if err != nil {
 				t.Fatalf("GetByID: %v", err)
 			}
@@ -238,7 +241,7 @@ func TestTicketUsuarioRepository(t *testing.T) {
 				t.Fatalf("preload mismatch")
 			}
 
-			list, err := tuRepo.ListByUsuarioID(ctx, pessoa.ID, 10, 0)
+			list, err := tcRepo.ListByUsuarioID(ctx, pessoa.ID, 10, 0)
 			if err != nil {
 				t.Fatalf("ListByUsuarioID: %v", err)
 			}
@@ -246,10 +249,10 @@ func TestTicketUsuarioRepository(t *testing.T) {
 				t.Fatalf("expected 1 record, got %d", len(list))
 			}
 
-			if err := tuRepo.UpdateStatus(ctx, tu.ID, model.TicketsStatusPago); err != nil {
+			if err := tcRepo.UpdateStatus(ctx, tc.ID, model.TicketsStatusPago); err != nil {
 				t.Fatalf("UpdateStatus: %v", err)
 			}
-			got2, err := tuRepo.GetByID(ctx, tu.ID)
+			got2, err := tcRepo.GetByID(ctx, tc.ID)
 			if err != nil {
 				t.Fatalf("GetByID after UpdateStatus: %v", err)
 			}
@@ -257,10 +260,10 @@ func TestTicketUsuarioRepository(t *testing.T) {
 				t.Fatalf("status not updated")
 			}
 
-			if err := tuRepo.Delete(ctx, tu.ID); err != nil {
+			if err := tcRepo.Delete(ctx, tc.ID); err != nil {
 				t.Fatalf("Delete: %v", err)
 			}
-			_, err = tuRepo.GetByID(ctx, tu.ID)
+			_, err = tcRepo.GetByID(ctx, tc.ID)
 			if !errors.Is(err, repository.ErrNotFound) {
 				t.Fatalf("expected ErrNotFound, got %v", err)
 			}
@@ -279,7 +282,7 @@ func TestPagamentoAndEstornoRepositories(t *testing.T) {
 
 	pRepo := repository.NewPessoaRepository(tdb.DB)
 	tRepo := repository.NewTicketRepository(tdb.DB)
-	tuRepo := repository.NewTicketUsuarioRepository(tdb.DB)
+	tcRepo := repository.NewTicketCompraRepository(tdb.DB)
 	payRepo := repository.NewPagamentoRepository(tdb.DB)
 	estRepo := repository.NewEstornoRepository(tdb.DB)
 
@@ -295,15 +298,15 @@ func TestPagamentoAndEstornoRepositories(t *testing.T) {
 		{name: "fluxo-2", txID: "tx-002", estornoTx: "st-002", metodoNovo: model.MetodoPagamentoCartaoCredito, cpf: "00000000201", email: "ciclano2@example.com"},
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
+	for _, tcCase := range cases {
+		t.Run(tcCase.name, func(t *testing.T) {
 			pessoa := model.Pessoa{
 				Nome:        "Ciclano",
 				TipoUsuario: model.TipoUsuarioUsuario,
 				Senha:       "hash",
-				CPF:         tc.cpf,
+				CPF:         tcCase.cpf,
 				Idade:       22,
-				Email:       tc.email,
+				Email:       tcCase.email,
 				Sexo:        model.SexoMasculino,
 				EstadoUF:    model.EstadoUFMinasGerais,
 				EstadoCivil: model.EstadoCivilSolteiro,
@@ -313,6 +316,7 @@ func TestPagamentoAndEstornoRepositories(t *testing.T) {
 			}
 
 			ticket := model.Ticket{
+				Tipo:                 model.TipoTicketDuo,
 				Nome:                 "Ingresso 3",
 				Descricao:            "Standard",
 				Preco:                decimal.NewFromFloat(15.00),
@@ -324,21 +328,22 @@ func TestPagamentoAndEstornoRepositories(t *testing.T) {
 			}
 			quantidadeInicial := ticket.QuantidadeDisponivel
 
-			tu := model.TicketUsuario{
-				UsuarioID: pessoa.ID,
-				TicketID:  ticket.ID,
-				Status:    model.TicketsStatusPendente,
+			compra := model.TicketCompra{
+				UsuarioID:  pessoa.ID,
+				TicketID:   ticket.ID,
+				Quantidade: 2,
+				Status:     model.TicketsStatusPendente,
 			}
-			if err := tuRepo.Create(ctx, &tu); err != nil {
-				t.Fatalf("seed ticket usuario: %v", err)
+			if err := tcRepo.Create(ctx, &compra); err != nil {
+				t.Fatalf("seed ticket compra: %v", err)
 			}
 
 			pagamento := model.Pagamento{
-				IDTransacao:      tc.txID,
-				Valor:            decimal.NewFromFloat(15.00),
-				TicketsUsuarioID: tu.ID,
-				Metodo:           model.MetodoPagamentoPix,
-				DataPagamento:    time.Now().UTC(),
+				IDTransacao:    tcCase.txID,
+				Valor:          decimal.NewFromFloat(15.00),
+				TicketCompraID: compra.ID,
+				Metodo:         model.MetodoPagamentoPix,
+				DataPagamento:  time.Now().UTC(),
 			}
 			if err := payRepo.CreateAndMarkTicketPago(ctx, &pagamento); err != nil {
 				t.Fatalf("CreateAndMarkTicketPago: %v", err)
@@ -348,19 +353,19 @@ func TestPagamentoAndEstornoRepositories(t *testing.T) {
 			if err != nil {
 				t.Fatalf("GetByID ticket pago: %v", err)
 			}
-			if gotTicketPago.QuantidadeDisponivel != quantidadeInicial-1 {
+			if gotTicketPago.QuantidadeDisponivel != quantidadeInicial-4 {
 				t.Fatalf("quantidade_disponivel nao atualizada no pagamento")
 			}
 
-			gotTU, err := tuRepo.GetByID(ctx, tu.ID)
+			gotTC, err := tcRepo.GetByID(ctx, compra.ID)
 			if err != nil {
-				t.Fatalf("GetByID tu: %v", err)
+				t.Fatalf("GetByID tc: %v", err)
 			}
-			if gotTU.Status != model.TicketsStatusPago {
+			if gotTC.Status != model.TicketsStatusPago {
 				t.Fatalf("expected status Pago")
 			}
 
-			gotPayByTx, err := payRepo.GetByIDTransacao(ctx, tc.txID)
+			gotPayByTx, err := payRepo.GetByIDTransacao(ctx, tcCase.txID)
 			if err != nil {
 				t.Fatalf("GetByIDTransacao: %v", err)
 			}
@@ -368,9 +373,9 @@ func TestPagamentoAndEstornoRepositories(t *testing.T) {
 				t.Fatalf("expected pagamento ID")
 			}
 
-			listPay, err := payRepo.ListByTicketsUsuarioID(ctx, tu.ID, 10, 0)
+			listPay, err := payRepo.ListByTicketCompraID(ctx, compra.ID, 10, 0)
 			if err != nil {
-				t.Fatalf("ListByTicketsUsuarioID: %v", err)
+				t.Fatalf("ListByTicketCompraID: %v", err)
 			}
 			if len(listPay) != 1 {
 				t.Fatalf("expected 1 pagamento")
@@ -380,13 +385,13 @@ func TestPagamentoAndEstornoRepositories(t *testing.T) {
 			if err != nil {
 				t.Fatalf("GetByID pagamento: %v", err)
 			}
-			if gotPay.TicketsUsuarioID != tu.ID {
-				t.Fatalf("tickets usuario mismatch")
+			if gotPay.TicketCompraID != compra.ID {
+				t.Fatalf("ticket compra mismatch")
 			}
 
 			estorno := model.Estorno{
 				PagamentoID:        pagamento.ID,
-				IDTransacaoEstorno: tc.estornoTx,
+				IDTransacaoEstorno: tcCase.estornoTx,
 				Valor:              decimal.NewFromFloat(15.00),
 				Motivo:             "teste",
 				DataEstorno:        time.Now().UTC(),
@@ -403,15 +408,15 @@ func TestPagamentoAndEstornoRepositories(t *testing.T) {
 				t.Fatalf("quantidade_disponivel nao restaurada no estorno")
 			}
 
-			gotTU2, err := tuRepo.GetByID(ctx, tu.ID)
+			gotTC2, err := tcRepo.GetByID(ctx, compra.ID)
 			if err != nil {
-				t.Fatalf("GetByID tu after estorno: %v", err)
+				t.Fatalf("GetByID tc after estorno: %v", err)
 			}
-			if gotTU2.Status != model.TicketsStatusReembolsado {
+			if gotTC2.Status != model.TicketsStatusReembolsado {
 				t.Fatalf("expected status Reembolsado")
 			}
 
-			gotEstTx, err := estRepo.GetByIDTransacaoEstorno(ctx, tc.estornoTx)
+			gotEstTx, err := estRepo.GetByIDTransacaoEstorno(ctx, tcCase.estornoTx)
 			if err != nil {
 				t.Fatalf("GetByIDTransacaoEstorno: %v", err)
 			}
@@ -436,7 +441,7 @@ func TestPagamentoAndEstornoRepositories(t *testing.T) {
 			}
 
 			// Cobertura de Update e Deletes simples.
-			pagamento.Metodo = tc.metodoNovo
+			pagamento.Metodo = tcCase.metodoNovo
 			if err := payRepo.Update(ctx, &pagamento); err != nil {
 				t.Fatalf("Update pagamento: %v", err)
 			}

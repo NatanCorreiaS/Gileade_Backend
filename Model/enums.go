@@ -99,3 +99,11 @@ const (
 	MetodoPagamentoCartaoCredito MetodoPagamento = "Cartão de Crédito"
 	MetodoPagamentoBoleto        MetodoPagamento = "Boleto"
 )
+
+type TipoTicket string
+
+const (
+	TipoTicketIndividual TipoTicket = "Individual"
+	TipoTicketDuo        TipoTicket = "Duo"
+	TipoTicketCaravana   TipoTicket = "Caravana"
+)

@@ -5,63 +5,82 @@ import (
 	"testing"
 	"time"
 
-	"github.com/testcontainers/testcontainers-go"
+	"gileade/gileade_backend/db"
+
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
-	"github.com/testcontainers/testcontainers-go/wait"
-	pgdriver "gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
-type PostgresTestDB struct {
+type TestDB struct {
 	DB        *gorm.DB
 	Container *postgres.PostgresContainer
 }
 
-// StartPostgres sobe um container Postgres para testes.
-func StartPostgres(t *testing.T) PostgresTestDB {
+// StartPostgres sobe um Postgres de teste e abre a conexao Gorm.
+func StartPostgres(t *testing.T) TestDB {
 	t.Helper()
 
 	ctx := context.Background()
 	container, err := postgres.Run(
 		ctx,
-		"postgres:18.3",
+		"postgres:16-alpine",
 		postgres.WithDatabase("gileade_test"),
 		postgres.WithUsername("gileade"),
 		postgres.WithPassword("gileade"),
-		testcontainers.WithWaitStrategy(
-			wait.ForLog("database system is ready to accept connections").
-				WithOccurrence(2).
-				WithStartupTimeout(60*time.Second),
-		),
 	)
 	if err != nil {
-		t.Fatalf("start postgres container: %v", err)
+		t.Fatalf("start postgres: %v", err)
 	}
+
+	host, err := container.Host(ctx)
+	if err != nil {
+		_ = container.Terminate(ctx)
+		t.Fatalf("host: %v", err)
+	}
+	port, err := container.MappedPort(ctx, "5432/tcp")
+	if err != nil {
+		_ = container.Terminate(ctx)
+		t.Fatalf("port: %v", err)
+	}
+
+	cfg := db.PostgresConfig{
+		Host:     host,
+		Port:     port.Int(),
+		User:     "gileade",
+		Password: "gileade",
+		DBName:   "gileade_test",
+		SSLMode:  "disable",
+		TimeZone: "UTC",
+		LogLevel: logger.Silent,
+	}
+
+	var dbConn *gorm.DB
+	var lastErr error
+	for i := 0; i < 10; i++ {
+		dbConn, err = db.OpenPostgres(cfg)
+		if err == nil {
+			lastErr = nil
+			break
+		}
+		lastErr = err
+		time.Sleep(300 * time.Millisecond)
+	}
+	if lastErr != nil {
+		_ = container.Terminate(ctx)
+		t.Fatalf("OpenPostgres: %v", lastErr)
+	}
+
+	sqlDB, err := dbConn.DB()
+	if err != nil {
+		_ = container.Terminate(ctx)
+		t.Fatalf("DB: %v", err)
+	}
+
 	t.Cleanup(func() {
+		_ = sqlDB.Close()
 		_ = container.Terminate(ctx)
 	})
 
-	connStr, err := container.ConnectionString(ctx, "sslmode=disable")
-	if err != nil {
-		t.Fatalf("postgres connection string: %v", err)
-	}
-
-	db, err := gorm.Open(
-		pgdriver.Open(connStr),
-		&gorm.Config{Logger: logger.Default.LogMode(logger.Silent)},
-	)
-	if err != nil {
-		t.Fatalf("open gorm: %v", err)
-	}
-
-	sqlDB, err := db.DB()
-	if err != nil {
-		t.Fatalf("db handle: %v", err)
-	}
-	if err := sqlDB.Ping(); err != nil {
-		t.Fatalf("ping: %v", err)
-	}
-
-	return PostgresTestDB{DB: db, Container: container}
+	return TestDB{DB: dbConn, Container: container}
 }

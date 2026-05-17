@@ -27,19 +27,20 @@ func NewPagamentoController(db *gorm.DB, gw *gateway.MercadoPagoGateway) *Pagame
 }
 
 type CheckoutRequest struct {
-	UsuarioID       uint64 `json:"usuario_id" binding:"required"`
-	TicketID        uint64 `json:"ticket_id" binding:"required"`
-	SuccessURL      string `json:"success_url"`
-	FailureURL      string `json:"failure_url"`
-	PendingURL      string `json:"pending_url"`
-	NotificationURL string `json:"notification_url"`
+	UsuarioID       uint64   `json:"usuario_id" binding:"required"`
+	TicketID        uint64   `json:"ticket_id" binding:"required"`
+	Quantidade      uint64   `json:"quantidade"`
+	SuccessURL      string   `json:"success_url"`
+	FailureURL      string   `json:"failure_url"`
+	PendingURL      string   `json:"pending_url"`
+	CPFBeneficiados []string `json:"cpf_beneficiados"`
 }
 
 type CheckoutResponse struct {
-	PreferenceID    string `json:"preference_id"`
-	InitPoint       string `json:"init_point"`
-	SandboxInit     string `json:"sandbox_init_point"`
-	TicketUsuarioID uint64 `json:"ticket_usuario_id"`
+	PreferenceID   string `json:"preference_id"`
+	InitPoint      string `json:"init_point"`
+	SandboxInit    string `json:"sandbox_init_point"`
+	TicketCompraID uint64 `json:"ticket_compra_id"`
 }
 
 type WebhookPayload struct {
@@ -69,22 +70,31 @@ func (c *PagamentoController) CreateCheckout(ctx *gin.Context) {
 	resp, err := c.payService.CriarCheckout(ctx, service.CheckoutRequest{
 		UsuarioID:       req.UsuarioID,
 		TicketID:        req.TicketID,
+		Quantidade:      req.Quantidade,
 		SuccessURL:      req.SuccessURL,
 		FailureURL:      req.FailureURL,
 		PendingURL:      req.PendingURL,
-		NotificationURL: req.NotificationURL,
+		CPFBeneficiados: req.CPFBeneficiados,
 	})
 	if err != nil {
 		audit.GetLogger().LogEvent("pagamento_checkout_criar", false, map[string]any{
 			"usuario_id": req.UsuarioID,
 			"ticket_id":  req.TicketID,
 		}, err)
-		if errors.Is(err, service.ErrNotificationURLObrigatoria) {
-			ctx.JSON(http.StatusBadRequest, gin.H{"erro": "notification_url obrigatório"})
-			return
-		}
 		if errors.Is(err, repository.ErrNotFound) {
 			ctx.JSON(http.StatusNotFound, gin.H{"erro": "usuario ou ticket nao encontrado"})
+			return
+		}
+		if errors.Is(err, repository.ErrTipoTicketInvalido) {
+			ctx.JSON(http.StatusBadRequest, gin.H{"erro": "tipo de ticket invalido"})
+			return
+		}
+		if errors.Is(err, service.ErrQuantidadeInvalida) || errors.Is(err, service.ErrCPFBeneficiadosInvalido) {
+			ctx.JSON(http.StatusBadRequest, gin.H{"erro": "dados de quantidade ou beneficiados invalidos"})
+			return
+		}
+		if errors.Is(err, service.ErrNotificationURLObrigatoria) {
+			ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "notification_url nao configurado"})
 			return
 		}
 		ctx.JSON(http.StatusBadGateway, gin.H{"erro": "falha ao criar preferência no Mercado Pago"})
@@ -92,17 +102,17 @@ func (c *PagamentoController) CreateCheckout(ctx *gin.Context) {
 	}
 
 	audit.GetLogger().LogEvent("pagamento_checkout_criar", true, map[string]any{
-		"ticket_usuario_id": resp.TicketUsuarioID,
-		"usuario_id":        req.UsuarioID,
-		"ticket_id":         req.TicketID,
-		"preference_id":     resp.PreferenceID,
+		"ticket_compra_id": resp.TicketCompraID,
+		"usuario_id":       req.UsuarioID,
+		"ticket_id":        req.TicketID,
+		"preference_id":    resp.PreferenceID,
 	}, nil)
 
 	ctx.JSON(http.StatusOK, CheckoutResponse{
-		PreferenceID:    resp.PreferenceID,
-		InitPoint:       resp.InitPoint,
-		SandboxInit:     resp.SandboxInit,
-		TicketUsuarioID: resp.TicketUsuarioID,
+		PreferenceID:   resp.PreferenceID,
+		InitPoint:      resp.InitPoint,
+		SandboxInit:    resp.SandboxInit,
+		TicketCompraID: resp.TicketCompraID,
 	})
 }
 

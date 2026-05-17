@@ -64,8 +64,8 @@ func (r *EstornoRepository) Delete(ctx context.Context, id uint64) error {
 	return mapGormErr(r.db.WithContext(ctx).Delete(&model.Estorno{}, id).Error)
 }
 
-// CreateAndMarkTicketReembolsado cria um estorno e marca o TicketUsuario relacionado como Reembolsado.
-// A relação é descoberta via Pagamento -> TicketsUsuarioID dentro da transação.
+// CreateAndMarkTicketReembolsado cria um estorno e marca o TicketCompra relacionado como Reembolsado.
+// A relação é descoberta via Pagamento -> TicketCompraID dentro da transação.
 func (r *EstornoRepository) CreateAndMarkTicketReembolsado(ctx context.Context, estorno *model.Estorno) error {
 	return mapGormErr(r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(estorno).Error; err != nil {
@@ -73,18 +73,28 @@ func (r *EstornoRepository) CreateAndMarkTicketReembolsado(ctx context.Context, 
 		}
 
 		var pagamento model.Pagamento
-		err := tx.Select("id", "tickets_usuario_id").First(&pagamento, estorno.PagamentoID).Error
+		err := tx.Select("id", "ticket_compra_id").First(&pagamento, estorno.PagamentoID).Error
 		if err != nil {
 			return err
 		}
 
-		var tu model.TicketUsuario
-		if err := tx.Select("id", "ticket_id").First(&tu, pagamento.TicketsUsuarioID).Error; err != nil {
+		var tc model.TicketCompra
+		if err := tx.Preload("Ticket").First(&tc, pagamento.TicketCompraID).Error; err != nil {
 			return err
 		}
 
-		res := tx.Model(&model.TicketUsuario{}).
-			Where("id = ?", pagamento.TicketsUsuarioID).
+		unidadesPorTicket, err := unidadesPorTicket(tc.Ticket.Tipo)
+		if err != nil {
+			return err
+		}
+		quantidade := tc.Quantidade
+		if quantidade == 0 {
+			quantidade = 1
+		}
+		quantidadeTotal := unidadesPorTicket * quantidade
+
+		res := tx.Model(&model.TicketCompra{}).
+			Where("id = ?", pagamento.TicketCompraID).
 			Update("status", model.TicketsStatusReembolsado)
 		if res.Error != nil {
 			return res.Error
@@ -94,8 +104,8 @@ func (r *EstornoRepository) CreateAndMarkTicketReembolsado(ctx context.Context, 
 		}
 
 		res = tx.Model(&model.Ticket{}).
-			Where("id = ?", tu.TicketID).
-			Update("quantidade_disponivel", gorm.Expr("quantidade_disponivel + 1"))
+			Where("id = ?", tc.TicketID).
+			Update("quantidade_disponivel", gorm.Expr("quantidade_disponivel + ?", quantidadeTotal))
 		if res.Error != nil {
 			return res.Error
 		}

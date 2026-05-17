@@ -5,29 +5,31 @@ Base URL (dev): `http://localhost:8080`
 
 ### Criar Checkout Pro
 
-**POST** `/api/v1/checkout/pro`
+**POST** `/api/v1/pagamentos/checkout`
 
-Cria uma preferencia no Mercado Pago (Checkout Pro) e registra um `TicketUsuario` com status `Pendente`.
+Cria uma preferencia no Mercado Pago (Checkout Pro) e registra um `TicketCompra` com status `Pendente`.
 
 **Request JSON**
 ```json
 {
 	"usuario_id": 1,
 	"ticket_id": 2,
+	"quantidade": 1,
 	"success_url": "https://seu-site.com/checkout/sucesso",
 	"failure_url": "https://seu-site.com/checkout/erro",
-	"pending_url": "https://seu-site.com/checkout/pendente",
-	"notification_url": "https://seu-dominio.com/api/v1/mercadopago/webhook"
+	"pending_url": "https://seu-site.com/checkout/pendente"
 }
 ```
 
 **Campos**
 - `usuario_id` (obrigatorio): ID da pessoa compradora.
 - `ticket_id` (obrigatorio): ID do ticket a ser comprado.
+- `quantidade` (opcional): quantidade de unidades do ticket (default: 1).
+- `cpf_beneficiados` (opcional): lista de CPFs para o tipo do ticket (Individual=1, Duo=2, Caravana=10 por unidade).
 - `success_url` (opcional): URL de retorno quando aprovado.
 - `failure_url` (opcional): URL de retorno quando falhar.
 - `pending_url` (opcional): URL de retorno quando pendente.
-- `notification_url` (opcional): URL do webhook; se vazio, usa `MERCADO_PAGO_NOTIFICATION_URL` do `.env`.
+O `notification_url` e sempre lido do `.env` via `MERCADO_PAGO_NOTIFICATION_URL`.
 
 **Response 200**
 ```json
@@ -35,12 +37,13 @@ Cria uma preferencia no Mercado Pago (Checkout Pro) e registra um `TicketUsuario
 	"preference_id": "1234567890",
 	"init_point": "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=...",
 	"sandbox_init_point": "https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id=...",
-	"ticket_usuario_id": 15
+	"ticket_compra_id": 15
 }
 ```
 
 **Erros comuns**
-- `400`: payload invalido ou `notification_url` ausente.
+- `400`: payload invalido.
+- `500`: `MERCADO_PAGO_NOTIFICATION_URL` nao configurada.
 - `404`: usuario ou ticket nao encontrados.
 - `502`: falha ao criar preferencia no Mercado Pago.
 
@@ -48,9 +51,9 @@ Cria uma preferencia no Mercado Pago (Checkout Pro) e registra um `TicketUsuario
 
 ### Webhook Mercado Pago
 
-**POST** `/api/v1/mercadopago/webhook`
+**POST** `/api/v1/pagamentos/webhook`
 
-Recebe notificacoes do Mercado Pago e registra o pagamento aprovado, marcando o `TicketUsuario` como `Pago` de forma atomica.
+Recebe notificacoes do Mercado Pago e registra o pagamento aprovado, marcando o `TicketCompra` como `Pago` de forma atomica.
 
 O endpoint aceita `data.id` por query string ou no corpo. Exemplo de payload basico:
 
@@ -189,6 +192,7 @@ Cria um ticket.
 **Request JSON**
 ```json
 {
+	"tipo": "Individual",
 	"nome": "Ingresso Geral",
 	"descricao": "Entrada padrao",
 	"preco": "120.00",
@@ -201,6 +205,7 @@ Cria um ticket.
 ```json
 {
 	"id": 10,
+	"tipo": "Individual",
 	"nome": "Ingresso Geral",
 	"descricao": "Entrada padrao",
 	"preco": "120.00",
@@ -235,9 +240,9 @@ Remove um ticket.
 
 ---
 
-### Tickets por usuario
+### Tickets por compra
 
-**POST** `/api/v1/tickets-usuario`
+**POST** `/api/v1/tickets-compra`
 
 Cria um vinculo entre usuario e ticket (status default: `Pendente`).
 
@@ -246,19 +251,20 @@ Cria um vinculo entre usuario e ticket (status default: `Pendente`).
 {
 	"usuario_id": 1,
 	"ticket_id": 10,
+	"quantidade": 1,
 	"status": "Pendente"
 }
 ```
 
-**GET** `/api/v1/tickets-usuario/:id`
+**GET** `/api/v1/tickets-compra/:id`
 
 Busca vinculo por ID.
 
-**GET** `/api/v1/usuarios/:id/tickets?limit=50&offset=0`
+**GET** `/api/v1/usuarios/:id/tickets-compra?limit=50&offset=0`
 
 Lista tickets do usuario.
 
-**PATCH** `/api/v1/tickets-usuario/:id/status`
+**PATCH** `/api/v1/tickets-compra/:id/status`
 
 Atualiza apenas o status.
 
@@ -269,7 +275,7 @@ Atualiza apenas o status.
 }
 ```
 
-**DELETE** `/api/v1/tickets-usuario/:id`
+**DELETE** `/api/v1/tickets-compra/:id`
 
 Remove o vinculo.
 
@@ -280,7 +286,7 @@ Remove o vinculo.
 O pagamento e registrado automaticamente quando o webhook do Mercado Pago confirma `approved`.
 Nao existe endpoint publico para criacao manual de pagamento.
 
-Estornos sao registrados no dominio com transacao e devem manter consistencia com o ticket do usuario.
+Estornos sao registrados no dominio com transacao e devem manter consistencia com o ticket da compra.
 Se for expor um endpoint de estorno, use transacao e registre auditoria.
 
 ---
@@ -321,6 +327,7 @@ Guarde o `id` retornado para usar como `usuario_id`.
 **Request JSON**
 ```json
 {
+	"tipo": "Individual",
 	"nome": "Ingresso Teste",
 	"descricao": "Entrada para teste rapido",
 	"preco": "10.00",
@@ -333,13 +340,14 @@ Guarde o `id` retornado para usar como `ticket_id`.
 
 ### 3) Criar Checkout Pro
 
-**POST** `/api/v1/checkout/pro`
+**POST** `/api/v1/pagamentos/checkout`
 
 **Request JSON**
 ```json
 {
 	"usuario_id": 1,
 	"ticket_id": 2,
+	"quantidade": 1,
 	"success_url": "https://seu-site.com/checkout/sucesso",
 	"failure_url": "https://seu-site.com/checkout/erro",
 	"pending_url": "https://seu-site.com/checkout/pendente"
