@@ -13,7 +13,7 @@ type TicketCaravana struct {
 	TicketID uint64 `gorm:"type:bigint;not null;index" json:"id_ticket"`
 	Ticket   Ticket `gorm:"foreignKey:TicketID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"ticket"`
 
-	CPFBeneficiados StringArray `gorm:"type:text[]" json:"cpf_beneficiados"`
+	BeneficiadosIDs Uint64Array `gorm:"type:bigint[]" json:"beneficiados_ids"`
 
 	DataCriacao     time.Time `gorm:"autoCreateTime" json:"data_criacao"`
 	DataAtualizacao time.Time `gorm:"autoUpdateTime" json:"data_atualizacao"`

@@ -15,6 +15,22 @@ Cria uma preferencia no Mercado Pago (Checkout Pro) e registra um `TicketCompra`
 	"usuario_id": 1,
 	"ticket_id": 2,
 	"quantidade": 1,
+	"beneficiados": [
+		{
+			"nome": "Beneficiado 1",
+			"cpf": "12345678901",
+			"idade": 29,
+			"celular": "+55 11 99999-0001",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado1@exemplo.com",
+			"sexo": "Feminino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		}
+	],
 	"success_url": "https://seu-site.com/checkout/sucesso",
 	"failure_url": "https://seu-site.com/checkout/erro",
 	"pending_url": "https://seu-site.com/checkout/pendente"
@@ -25,11 +41,14 @@ Cria uma preferencia no Mercado Pago (Checkout Pro) e registra um `TicketCompra`
 - `usuario_id` (obrigatorio): ID da pessoa compradora.
 - `ticket_id` (obrigatorio): ID do ticket a ser comprado.
 - `quantidade` (opcional): quantidade de unidades do ticket (default: 1).
-- `cpf_beneficiados` (opcional): lista de CPFs para o tipo do ticket (Individual=1, Duo=2, Caravana=10 por unidade).
+- `beneficiados` (obrigatorio): lista de beneficiados com dados completos (Individual=1, Duo=2, Caravana=10 por unidade).
 - `success_url` (opcional): URL de retorno quando aprovado.
 - `failure_url` (opcional): URL de retorno quando falhar.
 - `pending_url` (opcional): URL de retorno quando pendente.
 O `notification_url` e sempre lido do `.env` via `MERCADO_PAGO_NOTIFICATION_URL`.
+
+**Reaproveitamento de beneficiados**
+Se o CPF do beneficiado ja existir, o backend reutiliza o registro existente e nao cria duplicados.
 
 **Response 200**
 ```json
@@ -102,6 +121,7 @@ Cria uma pessoa (usuario/admin). A senha deve estar **hash**.
 	"senha": "hash_da_senha",
 	"cpf": "12345678901",
 	"idade": 29,
+	"celular": "+55 11 99999-0001",
 	"igreja": "Igreja Central",
 	"papel_igreja": "Membro",
 	"estado_civil": "Solteiro(a)",
@@ -125,6 +145,7 @@ Cria uma pessoa (usuario/admin). A senha deve estar **hash**.
 	"tipo_usuario": "Usuario",
 	"cpf": "12345678901",
 	"idade": 29,
+	"celular": "+55 11 99999-0001",
 	"igreja": "Igreja Central",
 	"papel_igreja": "Membro",
 	"estado_civil": "Solteiro(a)",
@@ -149,6 +170,7 @@ Lista pessoas paginadas.
 		"tipo_usuario": "Usuario",
 		"cpf": "12345678901",
 		"idade": 29,
+		"celular": "+55 11 99999-0001",
 		"igreja": "Igreja Central",
 		"papel_igreja": "Membro",
 		"estado_civil": "Solteiro(a)",
@@ -291,6 +313,22 @@ Se for expor um endpoint de estorno, use transacao e registre auditoria.
 
 ---
 
+### Consulta de pagamentos
+
+**GET** `/api/v1/pagamentos?usuario_id=1&status=Pago&data_inicio=2026-01-01&data_fim=2026-12-31&limit=50&offset=0`
+
+Lista pagamentos por usuario com filtros opcionais.
+
+**Query params**
+- `usuario_id` (obrigatorio): um ou mais IDs (separados por virgula).
+- `status` (opcional): `Pendente`, `Pago`, `Cancelado`, `Reembolsado`.
+- `data_inicio` (opcional): data no formato `YYYY-MM-DD`.
+- `data_fim` (opcional): data no formato `YYYY-MM-DD`.
+- `limit` (opcional): default 50.
+- `offset` (opcional): default 0.
+
+---
+
 ## Teste rapido de compra (Checkout Pro)
 
 Passo a passo com apenas os endpoints necessarios para criar usuario e ticket, gerar o checkout e finalizar a compra.
@@ -307,6 +345,7 @@ Passo a passo com apenas os endpoints necessarios para criar usuario e ticket, g
 	"senha": "hash_da_senha",
 	"cpf": "40402519890",
 	"idade": 30,
+	"celular": "+55 11 99999-0001",
 	"igreja": "Igreja Teste",
 	"papel_igreja": "Membro",
 	"estado_civil": "Solteiro(a)",
@@ -348,6 +387,22 @@ Guarde o `id` retornado para usar como `ticket_id`.
 	"usuario_id": 1,
 	"ticket_id": 2,
 	"quantidade": 1,
+	"beneficiados": [
+		{
+			"nome": "Beneficiado 1",
+			"cpf": "12345678901",
+			"idade": 29,
+			"celular": "+55 11 99999-0001",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado1@exemplo.com",
+			"sexo": "Feminino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		}
+	],
 	"success_url": "https://seu-site.com/checkout/sucesso",
 	"failure_url": "https://seu-site.com/checkout/erro",
 	"pending_url": "https://seu-site.com/checkout/pendente"

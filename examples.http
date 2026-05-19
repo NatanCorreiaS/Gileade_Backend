@@ -11,6 +11,7 @@ Content-Type: application/json
 	"senha": "hash_da_senha",
 	"cpf": "12345678909",
 	"idade": 29,
+	"celular": "+55 11 99999-0001",
 	"igreja": "Igreja Central",
 	"papel_igreja": "Membro",
 	"estado_civil": "Solteiro(a)",
@@ -31,6 +32,7 @@ Content-Type: application/json
 	"senha": "hash_da_senha",
 	"cpf": "12345678909",
 	"idade": 29,
+	"celular": "+55 11 99999-0001",
 	"igreja": "Igreja Central",
 	"papel_igreja": "Membro",
 	"estado_civil": "Solteiro(a)",
@@ -151,7 +153,23 @@ Content-Type: application/json
 {
 	"usuario_id": 8,
 	"ticket_id": 2,
-	"quantidade": 2,
+	"beneficiados": [
+		{
+			"nome": "Beneficiado 1",
+			"cpf": "12345678909",
+			"idade": 29,
+			"celular": "+55 11 99999-0001",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado1@exemplo.com",
+			"sexo": "Masculino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		}
+	],
+	"quantidade": 1,
 	"success_url": "https://seu-site.com/checkout/sucesso",
 	"failure_url": "https://seu-site.com/checkout/erro",
 	"pending_url": "https://seu-site.com/checkout/pendente"
@@ -164,7 +182,23 @@ Content-Type: application/json
 {
 	"usuario_id": 1,
 	"ticket_id": 2,
-	"quantidade": 2,
+	"beneficiados": [
+		{
+			"nome": "Beneficiado 1",
+			"cpf": "12345678909",
+			"idade": 29,
+			"celular": "+55 11 99999-0001",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado1@exemplo.com",
+			"sexo": "Masculino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		}
+	],
+	"quantidade": 1,
 	"success_url": "https://seu-site.com/checkout/sucesso",
 	"failure_url": "https://seu-site.com/checkout/erro",
 	"pending_url": "https://seu-site.com/checkout/pendente"

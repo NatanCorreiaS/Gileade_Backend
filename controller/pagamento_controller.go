@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
-	"strconv"
-	"strings"
-
+	model "gileade/gileade_backend/Model"
 	"gileade/gileade_backend/audit"
 	"gileade/gileade_backend/gateway"
 	"gileade/gileade_backend/repository"
 	"gileade/gileade_backend/service"
+	"io"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -20,20 +21,39 @@ import (
 
 type PagamentoController struct {
 	payService *service.PagamentoService
+	payRepo    *repository.PagamentoRepository
 }
 
 func NewPagamentoController(db *gorm.DB, gw *gateway.MercadoPagoGateway) *PagamentoController {
-	return &PagamentoController{payService: service.NewPagamentoService(db, gw)}
+	return &PagamentoController{
+		payService: service.NewPagamentoService(db, gw),
+		payRepo:    repository.NewPagamentoRepository(db),
+	}
 }
 
 type CheckoutRequest struct {
-	UsuarioID       uint64   `json:"usuario_id" binding:"required"`
-	TicketID        uint64   `json:"ticket_id" binding:"required"`
-	Quantidade      uint64   `json:"quantidade"`
-	SuccessURL      string   `json:"success_url"`
-	FailureURL      string   `json:"failure_url"`
-	PendingURL      string   `json:"pending_url"`
-	CPFBeneficiados []string `json:"cpf_beneficiados"`
+	UsuarioID    uint64               `json:"usuario_id" binding:"required"`
+	TicketID     uint64               `json:"ticket_id" binding:"required"`
+	Quantidade   uint64               `json:"quantidade"`
+	SuccessURL   string               `json:"success_url"`
+	FailureURL   string               `json:"failure_url"`
+	PendingURL   string               `json:"pending_url"`
+	Beneficiados []BeneficiadoRequest `json:"beneficiados"`
+}
+
+type BeneficiadoRequest struct {
+	Nome         string             `json:"nome" binding:"required"`
+	CPF          string             `json:"cpf" binding:"required"`
+	Idade        int16              `json:"idade"`
+	Celular      string             `json:"celular"`
+	Igreja       string             `json:"igreja"`
+	PapelIgreja  model.PapelIgreja  `json:"papel_igreja"`
+	EstadoCivil  model.EstadoCivil  `json:"estado_civil"`
+	Email        string             `json:"email" binding:"required"`
+	Sexo         model.Sexo         `json:"sexo" binding:"required"`
+	Cidade       string             `json:"cidade"`
+	EstadoUF     model.EstadoUF     `json:"estado_uf"`
+	Escolaridade model.Escolaridade `json:"escolaridade"`
 }
 
 type CheckoutResponse struct {
@@ -41,6 +61,18 @@ type CheckoutResponse struct {
 	InitPoint      string `json:"init_point"`
 	SandboxInit    string `json:"sandbox_init_point"`
 	TicketCompraID uint64 `json:"ticket_compra_id"`
+}
+
+type PagamentoConsultaResponse struct {
+	ID             uint64                `json:"id"`
+	IDTransacao    string                `json:"id_transacao"`
+	Valor          string                `json:"valor"`
+	Metodo         model.MetodoPagamento `json:"metodo"`
+	DataPagamento  string                `json:"data_pagamento"`
+	TicketCompraID uint64                `json:"ticket_compra_id"`
+	UsuarioID      uint64                `json:"usuario_id"`
+	TicketID       uint64                `json:"ticket_id"`
+	Status         model.TicketsStatus   `json:"status"`
 }
 
 type WebhookPayload struct {
@@ -53,6 +85,7 @@ type WebhookPayload struct {
 
 func (c *PagamentoController) RegisterRoutes(rg *gin.RouterGroup) {
 	rg.POST("/pagamentos/checkout", c.CreateCheckout)
+	rg.GET("/pagamentos", c.ListPayments)
 	rg.POST("/pagamentos/webhook", c.HandleWebhook)
 }
 
@@ -68,13 +101,13 @@ func (c *PagamentoController) CreateCheckout(ctx *gin.Context) {
 	}
 
 	resp, err := c.payService.CriarCheckout(ctx, service.CheckoutRequest{
-		UsuarioID:       req.UsuarioID,
-		TicketID:        req.TicketID,
-		Quantidade:      req.Quantidade,
-		SuccessURL:      req.SuccessURL,
-		FailureURL:      req.FailureURL,
-		PendingURL:      req.PendingURL,
-		CPFBeneficiados: req.CPFBeneficiados,
+		UsuarioID:    req.UsuarioID,
+		TicketID:     req.TicketID,
+		Quantidade:   req.Quantidade,
+		SuccessURL:   req.SuccessURL,
+		FailureURL:   req.FailureURL,
+		PendingURL:   req.PendingURL,
+		Beneficiados: toBeneficiadosInput(req.Beneficiados),
 	})
 	if err != nil {
 		audit.GetLogger().LogEvent("pagamento_checkout_criar", false, map[string]any{
@@ -89,8 +122,8 @@ func (c *PagamentoController) CreateCheckout(ctx *gin.Context) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"erro": "tipo de ticket invalido"})
 			return
 		}
-		if errors.Is(err, service.ErrQuantidadeInvalida) || errors.Is(err, service.ErrCPFBeneficiadosInvalido) {
-			ctx.JSON(http.StatusBadRequest, gin.H{"erro": "dados de quantidade ou beneficiados invalidos"})
+		if errors.Is(err, service.ErrQuantidadeInvalida) || errors.Is(err, service.ErrBeneficiadosInvalidos) {
+			ctx.JSON(http.StatusBadRequest, gin.H{"erro": "beneficiados invalidos"})
 			return
 		}
 		if errors.Is(err, service.ErrNotificationURLObrigatoria) {
@@ -206,4 +239,112 @@ func (c *PagamentoController) HandleWebhook(ctx *gin.Context) {
 	}, nil)
 
 	ctx.JSON(http.StatusOK, gin.H{"status": result.Status})
+}
+
+func (c *PagamentoController) ListPayments(ctx *gin.Context) {
+	usuarioIDs, err := parseUsuarioIDs(ctx.Query("usuario_id"))
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "usuario_id invalido"})
+		return
+	}
+	if len(usuarioIDs) == 0 {
+		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "usuario_id obrigatorio"})
+		return
+	}
+
+	var status *model.TicketsStatus
+	if statusStr := strings.TrimSpace(ctx.Query("status")); statusStr != "" {
+		st := model.TicketsStatus(statusStr)
+		status = &st
+	}
+
+	var dataInicio *time.Time
+	if val := strings.TrimSpace(ctx.Query("data_inicio")); val != "" {
+		parsed, err := parseDate(val)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"erro": "data_inicio invalida"})
+			return
+		}
+		dataInicio = &parsed
+	}
+
+	var dataFim *time.Time
+	if val := strings.TrimSpace(ctx.Query("data_fim")); val != "" {
+		parsed, err := parseDate(val)
+		if err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"erro": "data_fim invalida"})
+			return
+		}
+		dataFim = &parsed
+	}
+
+	limit, _ := strconvAtoiDefault(ctx.Query("limit"), 50)
+	offset, _ := strconvAtoiDefault(ctx.Query("offset"), 0)
+
+	pagamentos, err := c.payRepo.ListByUsuarios(ctx, usuarioIDs, status, dataInicio, dataFim, limit, offset)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao listar pagamentos"})
+		return
+	}
+
+	resp := make([]PagamentoConsultaResponse, 0, len(pagamentos))
+	for _, pagamento := range pagamentos {
+		resp = append(resp, PagamentoConsultaResponse{
+			ID:             pagamento.ID,
+			IDTransacao:    pagamento.IDTransacao,
+			Valor:          pagamento.Valor.StringFixed(2),
+			Metodo:         pagamento.Metodo,
+			DataPagamento:  pagamento.DataPagamento.Format(time.RFC3339),
+			TicketCompraID: pagamento.TicketCompraID,
+			UsuarioID:      pagamento.TicketCompra.UsuarioID,
+			TicketID:       pagamento.TicketCompra.TicketID,
+			Status:         pagamento.TicketCompra.Status,
+		})
+	}
+
+	ctx.JSON(http.StatusOK, resp)
+}
+
+func parseUsuarioIDs(val string) ([]uint64, error) {
+	if strings.TrimSpace(val) == "" {
+		return nil, nil
+	}
+	parts := strings.Split(val, ",")
+	ids := make([]uint64, 0, len(parts))
+	for _, part := range parts {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		id, err := strconv.ParseUint(part, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
+func toBeneficiadosInput(reqs []BeneficiadoRequest) []service.BeneficiadoInput {
+	if len(reqs) == 0 {
+		return nil
+	}
+	inputs := make([]service.BeneficiadoInput, 0, len(reqs))
+	for _, req := range reqs {
+		inputs = append(inputs, service.BeneficiadoInput{
+			Nome:         req.Nome,
+			CPF:          req.CPF,
+			Idade:        req.Idade,
+			Celular:      req.Celular,
+			Igreja:       req.Igreja,
+			PapelIgreja:  req.PapelIgreja,
+			EstadoCivil:  req.EstadoCivil,
+			Email:        req.Email,
+			Sexo:         req.Sexo,
+			Cidade:       req.Cidade,
+			EstadoUF:     req.EstadoUF,
+			Escolaridade: req.Escolaridade,
+		})
+	}
+	return inputs
 }

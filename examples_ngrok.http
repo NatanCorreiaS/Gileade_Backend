@@ -1,6 +1,6 @@
 @base = https://unbitten-crescent-hut.ngrok-free.dev/api/v1
 
-### Pessoas - criar
+### 1) Criar pessoa (guarde o id)
 POST {{base}}/pessoas
 Content-Type: application/json
 
@@ -10,6 +10,7 @@ Content-Type: application/json
 	"senha": "hash_da_senha",
 	"cpf": "11111111111",
 	"idade": 29,
+	"celular": "+55 11 99999-0001",
 	"igreja": "Igreja Central",
 	"papel_igreja": "Membro",
 	"estado_civil": "Solteiro(a)",
@@ -20,7 +21,7 @@ Content-Type: application/json
 	"escolaridade": "Ensino Superior Completo"
 }
 
-### Tickets - criar Individual
+### 2) Criar ticket Individual (guarde o id)
 POST {{base}}/tickets
 Content-Type: application/json
 
@@ -33,7 +34,7 @@ Content-Type: application/json
 	"data_evento": "2026-10-20"
 }
 
-### Tickets - criar Duo
+### 3) Criar ticket Duo (guarde o id)
 POST {{base}}/tickets
 Content-Type: application/json
 
@@ -46,7 +47,7 @@ Content-Type: application/json
 	"data_evento": "2026-10-20"
 }
 
-### Tickets - criar Caravana
+### 4) Criar ticket Caravana (guarde o id)
 POST {{base}}/tickets
 Content-Type: application/json
 
@@ -59,7 +60,7 @@ Content-Type: application/json
 	"data_evento": "2026-10-20"
 }
 
-### Pagamentos - checkout Individual (quantidade 1)
+### 5) Checkout Individual (1 beneficiado)
 POST {{base}}/pagamentos/checkout
 Content-Type: application/json
 
@@ -67,15 +68,28 @@ Content-Type: application/json
 	"usuario_id": 1,
 	"ticket_id": 1,
 	"quantidade": 1,
-	"cpf_beneficiados": [
-		"11111111111"
+	"beneficiados": [
+		{
+			"nome": "Beneficiado 1",
+			"cpf": "11111111111",
+			"idade": 29,
+			"celular": "+55 11 99999-0001",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado1@exemplo.com",
+			"sexo": "Masculino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		}
 	],
 	"success_url": "https://seu-site.com/checkout/sucesso",
 	"failure_url": "https://seu-site.com/checkout/erro",
 	"pending_url": "https://seu-site.com/checkout/pendente"
 }
 
-### Pagamentos - checkout Duo (quantidade 1 = 2 beneficiados)
+### 6) Checkout Duo (2 beneficiados)
 POST {{base}}/pagamentos/checkout
 Content-Type: application/json
 
@@ -83,35 +97,42 @@ Content-Type: application/json
 	"usuario_id": 1,
 	"ticket_id": 2,
 	"quantidade": 1,
-	"cpf_beneficiados": [
-		"11111111111",
-		"22222222222"
+	"beneficiados": [
+		{
+			"nome": "Beneficiado 1",
+			"cpf": "32322311309",
+			"idade": 29,
+			"celular": "+55 13 99999-0001",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado1@exemplo.com",
+			"sexo": "Masculino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		},
+		{
+			"nome": "Beneficiado 2",
+			"cpf": "22222222222",
+			"idade": 30,
+			"celular": "+55 11 99999-0002",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado2@exemplo.com",
+			"sexo": "Feminino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		}
 	],
 	"success_url": "https://seu-site.com/checkout/sucesso",
 	"failure_url": "https://seu-site.com/checkout/erro",
 	"pending_url": "https://seu-site.com/checkout/pendente"
 }
 
-### Pagamentos - checkout Duo (quantidade 2 = 4 beneficiados)
-POST {{base}}/pagamentos/checkout
-Content-Type: application/json
-
-{
-	"usuario_id": 1,
-	"ticket_id": 2,
-	"quantidade": 2,
-	"cpf_beneficiados": [
-		"11111111111",
-		"22222222222",
-		"33333333333",
-		"44444444444"
-	],
-	"success_url": "https://seu-site.com/checkout/sucesso",
-	"failure_url": "https://seu-site.com/checkout/erro",
-	"pending_url": "https://seu-site.com/checkout/pendente"
-}
-
-### Pagamentos - checkout Caravana (quantidade 1 = 10 beneficiados)
+### 7) Checkout Caravana (10 beneficiados)
 POST {{base}}/pagamentos/checkout
 Content-Type: application/json
 
@@ -119,24 +140,160 @@ Content-Type: application/json
 	"usuario_id": 1,
 	"ticket_id": 3,
 	"quantidade": 1,
-	"cpf_beneficiados": [
-		"11111111111",
-		"22222222222",
-		"33333333333",
-		"44444444444",
-		"55555555555",
-		"66666666666",
-		"77777777777",
-		"88888888888",
-		"99999999999",
-		"00000000000"
+	"beneficiados": [
+		{
+			"nome": "Beneficiado 1",
+			"cpf": "11111111111",
+			"idade": 29,
+			"celular": "+55 11 99999-0001",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado1@exemplo.com",
+			"sexo": "Masculino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		},
+		{
+			"nome": "Beneficiado 2",
+			"cpf": "22222222222",
+			"idade": 30,
+			"celular": "+55 11 99999-0002",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado2@exemplo.com",
+			"sexo": "Feminino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		},
+		{
+			"nome": "Beneficiado 3",
+			"cpf": "33333333333",
+			"idade": 28,
+			"celular": "+55 11 99999-0003",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado3@exemplo.com",
+			"sexo": "Masculino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		},
+		{
+			"nome": "Beneficiado 4",
+			"cpf": "44444444444",
+			"idade": 27,
+			"celular": "+55 11 99999-0004",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado4@exemplo.com",
+			"sexo": "Feminino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		},
+		{
+			"nome": "Beneficiado 5",
+			"cpf": "55555555555",
+			"idade": 26,
+			"celular": "+55 11 99999-0005",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado5@exemplo.com",
+			"sexo": "Masculino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		},
+		{
+			"nome": "Beneficiado 6",
+			"cpf": "66666666666",
+			"idade": 25,
+			"celular": "+55 11 99999-0006",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado6@exemplo.com",
+			"sexo": "Feminino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		},
+		{
+			"nome": "Beneficiado 7",
+			"cpf": "77777777777",
+			"idade": 24,
+			"celular": "+55 11 99999-0007",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado7@exemplo.com",
+			"sexo": "Masculino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		},
+		{
+			"nome": "Beneficiado 8",
+			"cpf": "88888888888",
+			"idade": 23,
+			"celular": "+55 11 99999-0008",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado8@exemplo.com",
+			"sexo": "Feminino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		},
+		{
+			"nome": "Beneficiado 9",
+			"cpf": "99999999999",
+			"idade": 22,
+			"celular": "+55 11 99999-0009",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado9@exemplo.com",
+			"sexo": "Masculino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		},
+		{
+			"nome": "Beneficiado 10",
+			"cpf": "00000000000",
+			"idade": 21,
+			"celular": "+55 11 99999-0010",
+			"igreja": "Igreja Central",
+			"papel_igreja": "Membro",
+			"estado_civil": "Solteiro(a)",
+			"email": "beneficiado10@exemplo.com",
+			"sexo": "Feminino",
+			"cidade": "Sao Paulo",
+			"estado_uf": "SP",
+			"escolaridade": "Ensino Superior Completo"
+		}
 	],
 	"success_url": "https://seu-site.com/checkout/sucesso",
 	"failure_url": "https://seu-site.com/checkout/erro",
 	"pending_url": "https://seu-site.com/checkout/pendente"
 }
 
-### Pagamentos - webhook (body)
+### 8) Listar tickets-compra do usuario
+GET {{base}}/usuarios/1/tickets-compra?limit=50&offset=0
+
+### 9) Listar pagamentos do usuario (com filtros opcionais)
+GET {{base}}/pagamentos?usuario_id=1&status=Pago&data_inicio=2026-01-01&data_fim=2026-12-31&limit=50&offset=0
+
+### 10) Webhook de pagamento (simulacao)
 POST {{base}}/pagamentos/webhook
 Content-Type: application/json
 
@@ -146,32 +303,6 @@ Content-Type: application/json
 		"id": "1234567890"
 	}
 }
-
-### Tickets-compra - listar por usuario (filtre por status no retorno)
-GET {{base}}/usuarios/1/tickets-compra?limit=50&offset=0
-
-### Tickets-compra - buscar por ID
-GET {{base}}/tickets-compra/1
-
-### Tickets-compra - atualizar status para Pago
-PATCH {{base}}/tickets-compra/1/status
-Content-Type: application/json
-
-{
-	"status": "Pago"
-}
-
-### Tickets-compra - atualizar status para Cancelado
-PATCH {{base}}/tickets-compra/1/status
-Content-Type: application/json
-
-{
-	"status": "Cancelado"
-}
-
-### Tickets-compra - atualizar status para Reembolsado
-PATCH {{base}}/tickets-compra/1/status
-Content-Type: application/json
 
 {
 	"status": "Reembolsado"

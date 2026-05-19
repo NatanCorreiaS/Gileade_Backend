@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	model "gileade/gileade_backend/Model"
 
@@ -53,6 +54,50 @@ func (r *PagamentoRepository) ListByTicketCompraID(ctx context.Context, ticketCo
 	err := r.db.WithContext(ctx).
 		Where("ticket_compra_id = ?", ticketCompraID).
 		Order("id asc").
+		Limit(limit).
+		Offset(offset).
+		Find(&pagamentos).Error
+	return pagamentos, mapGormErr(err)
+}
+
+// ListByUsuarios lista pagamentos filtrando por usuarios e periodo.
+func (r *PagamentoRepository) ListByUsuarios(
+	ctx context.Context,
+	usuarioIDs []uint64,
+	status *model.TicketsStatus,
+	dataInicio *time.Time,
+	dataFim *time.Time,
+	limit,
+	offset int,
+) ([]model.Pagamento, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	query := r.db.WithContext(ctx).
+		Model(&model.Pagamento{}).
+		Joins("JOIN tickets_compra tc ON tc.id = pagamentos.ticket_compra_id")
+
+	if len(usuarioIDs) > 0 {
+		query = query.Where("tc.usuario_id IN ?", usuarioIDs)
+	}
+	if status != nil {
+		query = query.Where("tc.status = ?", *status)
+	}
+	if dataInicio != nil {
+		query = query.Where("pagamentos.data_pagamento >= ?", *dataInicio)
+	}
+	if dataFim != nil {
+		query = query.Where("pagamentos.data_pagamento <= ?", *dataFim)
+	}
+
+	var pagamentos []model.Pagamento
+	err := query.
+		Preload("TicketCompra").
+		Order("pagamentos.id asc").
 		Limit(limit).
 		Offset(offset).
 		Find(&pagamentos).Error

@@ -13,7 +13,8 @@ type TicketIndividual struct {
 	TicketID uint64 `gorm:"type:bigint;not null;index" json:"id_ticket"`
 	Ticket   Ticket `gorm:"foreignKey:TicketID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"ticket"`
 
-	CPFBeneficiado string `gorm:"type:text" json:"cpf_beneficiado"`
+	BeneficiadoID uint64      `gorm:"type:bigint;not null;index" json:"id_beneficiado"`
+	Beneficiado   Beneficiado `gorm:"foreignKey:BeneficiadoID;references:ID;constraint:OnUpdate:CASCADE,OnDelete:RESTRICT" json:"beneficiado"`
 
 	DataCriacao     time.Time `gorm:"autoCreateTime" json:"data_criacao"`
 	DataAtualizacao time.Time `gorm:"autoUpdateTime" json:"data_atualizacao"`

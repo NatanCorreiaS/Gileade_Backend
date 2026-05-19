@@ -17,6 +17,11 @@ func NewTicketCompraRepository(db *gorm.DB) *TicketCompraRepository {
 	return &TicketCompraRepository{db: db}
 }
 
+// WithTx retorna um repositorio com a transacao aplicada.
+func (r *TicketCompraRepository) WithTx(tx *gorm.DB) *TicketCompraRepository {
+	return &TicketCompraRepository{db: tx}
+}
+
 // Create insere um ticket_compra no banco.
 func (r *TicketCompraRepository) Create(ctx context.Context, tc *model.TicketCompra) error {
 	return mapGormErr(r.db.WithContext(ctx).Create(tc).Error)

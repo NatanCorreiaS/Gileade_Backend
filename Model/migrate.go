@@ -7,6 +7,7 @@ import "gorm.io/gorm"
 func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&Pessoa{},
+		&Beneficiado{},
 		&Ticket{},
 		&TicketCompra{},
 		&TicketIndividual{},

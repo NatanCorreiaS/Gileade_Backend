@@ -27,6 +27,7 @@ type PessoaCreateRequest struct {
 	Senha        string             `json:"senha" binding:"required"`
 	CPF          string             `json:"cpf" binding:"required"`
 	Idade        int16              `json:"idade"`
+	Celular      string             `json:"celular"`
 	Igreja       string             `json:"igreja"`
 	PapelIgreja  model.PapelIgreja  `json:"papel_igreja"`
 	EstadoCivil  model.EstadoCivil  `json:"estado_civil"`
@@ -43,6 +44,7 @@ type PessoaUpdateRequest struct {
 	Senha        *string             `json:"senha"`
 	CPF          *string             `json:"cpf"`
 	Idade        *int16              `json:"idade"`
+	Celular      *string             `json:"celular"`
 	Igreja       *string             `json:"igreja"`
 	PapelIgreja  *model.PapelIgreja  `json:"papel_igreja"`
 	EstadoCivil  *model.EstadoCivil  `json:"estado_civil"`
@@ -59,6 +61,7 @@ type PessoaResponse struct {
 	TipoUsuario  model.TipoUsuario  `json:"tipo_usuario"`
 	CPF          string             `json:"cpf"`
 	Idade        int16              `json:"idade"`
+	Celular      string             `json:"celular"`
 	Igreja       string             `json:"igreja"`
 	PapelIgreja  model.PapelIgreja  `json:"papel_igreja"`
 	EstadoCivil  model.EstadoCivil  `json:"estado_civil"`
@@ -97,6 +100,7 @@ func (c *PessoaController) Create(ctx *gin.Context) {
 		Senha:        req.Senha,
 		CPF:          req.CPF,
 		Idade:        req.Idade,
+		Celular:      req.Celular,
 		Igreja:       req.Igreja,
 		PapelIgreja:  req.PapelIgreja,
 		EstadoCivil:  req.EstadoCivil,
@@ -212,6 +216,9 @@ func (c *PessoaController) Update(ctx *gin.Context) {
 	if req.Idade != nil {
 		pessoa.Idade = *req.Idade
 	}
+	if req.Celular != nil {
+		pessoa.Celular = *req.Celular
+	}
 	if req.Igreja != nil {
 		pessoa.Igreja = *req.Igreja
 	}
@@ -303,6 +310,7 @@ func toPessoaResponse(p model.Pessoa) PessoaResponse {
 		TipoUsuario:  p.TipoUsuario,
 		CPF:          p.CPF,
 		Idade:        p.Idade,
+		Celular:      p.Celular,
 		Igreja:       p.Igreja,
 		PapelIgreja:  p.PapelIgreja,
 		EstadoCivil:  p.EstadoCivil,

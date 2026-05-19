@@ -2,23 +2,17 @@ package model
 
 import "time"
 
-// Pessoa representa a tabela "pessoas".
-// Campos e enums seguem o fluxograma.
-//
-// Importante (segurança): o campo Senha deve armazenar hash (nunca senha em texto puro).
+// Beneficiado representa a tabela "beneficiados".
 
-type Pessoa struct {
+type Beneficiado struct {
 	ID uint64 `gorm:"primaryKey;autoIncrement" json:"id"`
 
-	Nome        string      `gorm:"type:text;not null" json:"nome"`
-	TipoUsuario TipoUsuario `gorm:"type:text;not null" json:"tipo_usuario"`
-	Senha       string      `gorm:"type:text;not null" json:"senha"`
+	Nome string `gorm:"type:text;not null" json:"nome"`
+	CPF  string `gorm:"type:text;not null;uniqueIndex" json:"cpf"`
 
-	CPF     string `gorm:"type:text;not null;uniqueIndex" json:"cpf"`
 	Idade   int16  `gorm:"type:smallint;not null" json:"idade"`
 	Celular string `gorm:"type:text;not null" json:"celular"`
-
-	Igreja string `gorm:"type:text;not null" json:"igreja"`
+	Igreja  string `gorm:"type:text;not null" json:"igreja"`
 
 	PapelIgreja PapelIgreja `gorm:"type:text;not null" json:"papel_igreja"`
 	EstadoCivil EstadoCivil `gorm:"type:text;not null" json:"estado_civil"`
@@ -33,11 +27,9 @@ type Pessoa struct {
 
 	DataCriacao     time.Time `gorm:"autoCreateTime" json:"data_criacao"`
 	DataAtualizacao time.Time `gorm:"autoUpdateTime" json:"data_atualizacao"`
-
-	TicketsCompra []TicketCompra `gorm:"foreignKey:UsuarioID" json:"tickets_compra,omitempty"`
 }
 
-// TableName define o nome da tabela para Pessoa.
-func (Pessoa) TableName() string {
-	return "pessoas"
+// TableName define o nome da tabela para Beneficiado.
+func (Beneficiado) TableName() string {
+	return "beneficiados"
 }
