@@ -20,6 +20,7 @@ func NewRouter(deps AppDeps) *gin.Engine {
 	_ = r.SetTrustedProxies(nil)
 
 	api := r.Group("/api/v1")
+	controller.NewAuthController(deps.DB).RegisterRoutes(api)
 	controller.NewPessoaController(deps.DB).RegisterRoutes(api)
 	controller.NewTicketController(deps.DB).RegisterRoutes(api)
 	controller.NewTicketCompraController(deps.DB).RegisterRoutes(api)

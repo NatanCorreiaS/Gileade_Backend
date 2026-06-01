@@ -7,18 +7,23 @@ import (
 	model "gileade/gileade_backend/Model"
 	"gileade/gileade_backend/audit"
 	"gileade/gileade_backend/repository"
+	"gileade/gileade_backend/service"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
 
 type PessoaController struct {
-	repo *repository.PessoaRepository
+	repo        *repository.PessoaRepository
+	authService *service.AuthService
 }
 
 // NewPessoaController monta o controller de pessoas.
 func NewPessoaController(db *gorm.DB) *PessoaController {
-	return &PessoaController{repo: repository.NewPessoaRepository(db)}
+	return &PessoaController{
+		repo:        repository.NewPessoaRepository(db),
+		authService: service.NewAuthService(db),
+	}
 }
 
 type PessoaCreateRequest struct {
@@ -94,10 +99,21 @@ func (c *PessoaController) Create(ctx *gin.Context) {
 		return
 	}
 
+	senhaHash, err := c.authService.HashPassword(req.Senha)
+	if err != nil {
+		audit.GetLogger().LogEvent("pessoa_criar", false, map[string]any{
+			"nome":         req.Nome,
+			"cpf":          req.CPF,
+			"tipo_usuario": req.TipoUsuario,
+		}, err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao processar senha"})
+		return
+	}
+
 	pessoa := model.Pessoa{
 		Nome:         req.Nome,
 		TipoUsuario:  req.TipoUsuario,
-		Senha:        req.Senha,
+		Senha:        senhaHash,
 		CPF:          req.CPF,
 		Idade:        req.Idade,
 		Celular:      req.Celular,
@@ -208,7 +224,15 @@ func (c *PessoaController) Update(ctx *gin.Context) {
 		pessoa.TipoUsuario = *req.TipoUsuario
 	}
 	if req.Senha != nil {
-		pessoa.Senha = *req.Senha
+		senhaHash, err := c.authService.HashPassword(*req.Senha)
+		if err != nil {
+			audit.GetLogger().LogEvent("pessoa_atualizar", false, map[string]any{
+				"pessoa_id": id,
+			}, err)
+			ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao processar senha"})
+			return
+		}
+		pessoa.Senha = senhaHash
 	}
 	if req.CPF != nil {
 		pessoa.CPF = *req.CPF

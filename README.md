@@ -1,441 +1,359 @@
+# Gileade Backend
+
+API REST para o sistema de venda de ingressos **Gileade Connect**, integrada com Mercado Pago.
+
+## Tecnologias
+
+- **Golang** 1.26+
+- **Gin** — framework HTTP
+- **Gorm** — ORM com Postgres
+- **JWT** — autenticacao stateless
+- **Bcrypt** — hash de senhas
+
+## Variaveis de Ambiente
+
+| Variavel | Obrigatoria | Padrao | Descricao |
+|---|---|---|---|
+| `DB_HOST` | Sim | — | Host do Postgres |
+| `DB_PORT` | Sim | — | Porta do Postgres |
+| `DB_USER` | Sim | — | Usuario do Postgres |
+| `DB_PASSWORD` | Sim | — | Senha do Postgres |
+| `DB_NAME` | Sim | — | Nome do banco |
+| `DB_SSLMODE` | Nao | `disable` | Modo SSL |
+| `DB_TIMEZONE` | Nao | `UTC` | Timezone do banco |
+| `APP_PORT` | Nao | `8080` | Porta do servidor HTTP |
+| `JWT_SECRET` | Nao | aleatorio | Chave de assinatura dos tokens JWT |
+| `JWT_TTL_HOURS` | Nao | `24` | Tempo de vida do token em horas |
+| `MERCADO_PAGO_ACCESS_TOKEN_TEST` | Sim | — | Access token do Mercado Pago |
+| `MERCADO_PAGO_NOTIFICATION_URL` | Sim | — | URL de webhook do Mercado Pago |
+| `AUDIT_LOG_PATH` | Nao | `logs/audit.log` | Caminho do arquivo de auditoria |
+
+## Executar
+
+```bash
+# Subir o banco
+docker compose up -d
+
+# Executar a API
+cp .env.example .env  # preencher as variaveis
+go run .
+```
+
 ## Endpoints
 
-Base URL (dev): `http://localhost:8080`
-**ENDPOINT PUBLICO PARA TESTES**: `https://gileadebackend-production.up.railway.app`
-
-### Criar Checkout Pro
-
-**POST** `/api/v1/pagamentos/checkout`
-
-Cria uma preferencia no Mercado Pago (Checkout Pro) e registra um `TicketCompra` com status `Pendente`.
-
-**Request JSON**
-```json
-{
-	"usuario_id": 1,
-	"ticket_id": 2,
-	"quantidade": 1,
-	"beneficiados": [
-		{
-			"nome": "Beneficiado 1",
-			"cpf": "12345678901",
-			"idade": 29,
-			"celular": "+55 11 99999-0001",
-			"igreja": "Igreja Central",
-			"papel_igreja": "Membro",
-			"estado_civil": "Solteiro(a)",
-			"email": "beneficiado1@exemplo.com",
-			"sexo": "Feminino",
-			"cidade": "Sao Paulo",
-			"estado_uf": "SP",
-			"escolaridade": "Ensino Superior Completo"
-		}
-	],
-	"success_url": "https://seu-site.com/checkout/sucesso",
-	"failure_url": "https://seu-site.com/checkout/erro",
-	"pending_url": "https://seu-site.com/checkout/pendente"
-}
-```
-
-**Campos**
-- `usuario_id` (obrigatorio): ID da pessoa compradora.
-- `ticket_id` (obrigatorio): ID do ticket a ser comprado.
-- `quantidade` (opcional): quantidade de unidades do ticket (default: 1).
-- `beneficiados` (obrigatorio): lista de beneficiados com dados completos (Individual=1, Duo=2, Caravana=10 por unidade).
-- `success_url` (opcional): URL de retorno quando aprovado.
-- `failure_url` (opcional): URL de retorno quando falhar.
-- `pending_url` (opcional): URL de retorno quando pendente.
-O `notification_url` e sempre lido do `.env` via `MERCADO_PAGO_NOTIFICATION_URL`.
-
-**Reaproveitamento de beneficiados**
-Se o CPF do beneficiado ja existir, o backend reutiliza o registro existente e nao cria duplicados.
-
-**Response 200**
-```json
-{
-	"preference_id": "1234567890",
-	"init_point": "https://www.mercadopago.com.br/checkout/v1/redirect?pref_id=...",
-	"sandbox_init_point": "https://sandbox.mercadopago.com.br/checkout/v1/redirect?pref_id=...",
-	"ticket_compra_id": 15
-}
-```
-
-**Erros comuns**
-- `400`: payload invalido.
-- `500`: `MERCADO_PAGO_NOTIFICATION_URL` nao configurada.
-- `404`: usuario ou ticket nao encontrados.
-- `502`: falha ao criar preferencia no Mercado Pago.
+Prefixo base: `/api/v1`
 
 ---
 
-### Webhook Mercado Pago
+### Autenticacao
 
-**POST** `/api/v1/pagamentos/webhook`
+#### `POST /api/v1/auth/login`
 
-Recebe notificacoes do Mercado Pago e registra o pagamento aprovado, marcando o `TicketCompra` como `Pago` de forma atomica.
+Autentica um usuario por CPF e senha, retornando token JWT e dados do usuario.
 
-O endpoint aceita `data.id` por query string ou no corpo. Exemplo de payload basico:
-
-**Request JSON**
+**Request:**
 ```json
 {
-	"type": "payment",
-	"data": {
-		"id": "1234567890"
-	}
+  "cpf": "12345678900",
+  "senha": "minha-senha"
 }
 ```
 
-**Response 200 (aprovado)**
+**Response** `200`:
 ```json
 {
-	"status": "ok"
+  "token": "eyJhbGciOiJIUzI1NiIs...",
+  "usuario": {
+    "id": 1,
+    "nome": "Joao Silva",
+    "tipo_usuario": "Usuario",
+    "cpf": "12345678900",
+    "idade": 29,
+    "celular": "+55 11 99999-0001",
+    "igreja": "Igreja Central",
+    "papel_igreja": "Membro",
+    "estado_civil": "Solteiro(a)",
+    "email": "joao@exemplo.com",
+    "sexo": "Masculino",
+    "cidade": "Sao Paulo",
+    "estado_uf": "SP",
+    "escolaridade": "Ensino Superior Completo"
+  }
 }
 ```
 
-**Response 200 (nao aprovado)**
-```json
-{
-	"status": "pending"
-}
-```
-
-**Erros comuns**
-- `400`: `payment id` ausente ou invalido.
-- `502`: falha ao consultar pagamento no Mercado Pago.
-- `500`: falha ao registrar pagamento no banco.
+**Erros:**
+| Status | Mensagem |
+|---|---|
+| `400` | `cpf e senha sao obrigatorios` |
+| `401` | `cpf ou senha invalidos` |
 
 ---
 
-### Pessoas (usuarios e admins)
+#### `POST /api/v1/auth/logout`
 
-**POST** `/api/v1/pessoas`
+Invalida o token JWT, impedindo seu reuso ate a expiracao.
 
-Cria uma pessoa (usuario/admin). A senha deve estar **hash**.
+**Headers:**
+```
+Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+```
 
-**Request JSON**
+**Response** `200`:
 ```json
 {
-	"nome": "Maria Silva",
-	"tipo_usuario": "Usuario",
-	"senha": "hash_da_senha",
-	"cpf": "12345678901",
-	"idade": 29,
-	"celular": "+55 11 99999-0001",
-	"igreja": "Igreja Central",
-	"papel_igreja": "Membro",
-	"estado_civil": "Solteiro(a)",
-	"email": "maria@exemplo.com",
-	"sexo": "Feminino",
-	"cidade": "Sao Paulo",
-	"estado_uf": "SP",
-	"escolaridade": "Ensino Superior Completo"
+  "mensagem": "logout realizado"
 }
 ```
 
-**Tipos de usuario**
-- `Admin`: acesso administrativo (crie pela mesma rota).
-- `Usuario`: comprador/participante.
+**Erros:**
+| Status | Mensagem |
+|---|---|
+| `400` | `token de autorizacao ausente` |
 
-**Response 201**
+---
+
+### Pessoas
+
+#### `POST /api/v1/pessoas`
+
+Cadastra uma pessoa no sistema. A senha e automaticamente hasheada com bcrypt.
+
+**Request:**
 ```json
 {
-	"id": 1,
-	"nome": "Maria Silva",
-	"tipo_usuario": "Usuario",
-	"cpf": "12345678901",
-	"idade": 29,
-	"celular": "+55 11 99999-0001",
-	"igreja": "Igreja Central",
-	"papel_igreja": "Membro",
-	"estado_civil": "Solteiro(a)",
-	"email": "maria@exemplo.com",
-	"sexo": "Feminino",
-	"cidade": "Sao Paulo",
-	"estado_uf": "SP",
-	"escolaridade": "Ensino Superior Completo"
+  "nome": "Joao Silva",
+  "tipo_usuario": "Usuario",
+  "senha": "minha-senha",
+  "cpf": "12345678900",
+  "idade": 29,
+  "celular": "+55 11 99999-0001",
+  "igreja": "Igreja Central",
+  "papel_igreja": "Membro",
+  "estado_civil": "Solteiro(a)",
+  "email": "joao@exemplo.com",
+  "sexo": "Masculino",
+  "cidade": "Sao Paulo",
+  "estado_uf": "SP",
+  "escolaridade": "Ensino Superior Completo"
 }
 ```
 
-**GET** `/api/v1/pessoas?limit=50&offset=0`
+#### `GET /api/v1/pessoas?limit=50&offset=0`
 
-Lista pessoas paginadas.
+Lista pessoas com paginacao.
 
-**Response 200**
-```json
-[
-	{
-		"id": 1,
-		"nome": "Maria Silva",
-		"tipo_usuario": "Usuario",
-		"cpf": "12345678901",
-		"idade": 29,
-		"celular": "+55 11 99999-0001",
-		"igreja": "Igreja Central",
-		"papel_igreja": "Membro",
-		"estado_civil": "Solteiro(a)",
-		"email": "maria@exemplo.com",
-		"sexo": "Feminino",
-		"cidade": "Sao Paulo",
-		"estado_uf": "SP",
-		"escolaridade": "Ensino Superior Completo"
-	}
-]
-```
+#### `GET /api/v1/pessoas/:id`
 
-**GET** `/api/v1/pessoas/:id`
+Busca uma pessoa pelo ID.
 
-Busca pessoa por ID.
+#### `PUT /api/v1/pessoas/:id`
 
-**PUT** `/api/v1/pessoas/:id`
+Atualiza dados de uma pessoa. Campos enviados como `null` sao ignorados. Se enviar `senha`, ela sera hasheada automaticamente.
 
-Atualiza campos (envie apenas os que quer alterar).
+#### `DELETE /api/v1/pessoas/:id`
 
-**Request JSON**
-```json
-{
-	"nome": "Maria Silva Souza",
-	"email": "maria.souza@exemplo.com"
-}
-```
-
-**DELETE** `/api/v1/pessoas/:id`
-
-Remove uma pessoa.
+Remove uma pessoa pelo ID.
 
 ---
 
 ### Tickets
 
-**POST** `/api/v1/tickets`
+#### `POST /api/v1/tickets`
 
-Cria um ticket.
+Cria um tipo de ingresso.
 
-**Request JSON**
+**Request:**
 ```json
 {
-	"tipo": "Individual",
-	"nome": "Ingresso Geral",
-	"descricao": "Entrada padrao",
-	"preco": "120.00",
-	"quantidade_disponivel": 100,
-	"data_evento": "2026-10-20"
+  "tipo": "Individual",
+  "nome": "Ingresso Geral",
+  "descricao": "Entrada padrao",
+  "preco": "120.00",
+  "quantidade_disponivel": 100,
+  "data_evento": "2026-10-20"
 }
 ```
 
-**Response 201**
-```json
-{
-	"id": 10,
-	"tipo": "Individual",
-	"nome": "Ingresso Geral",
-	"descricao": "Entrada padrao",
-	"preco": "120.00",
-	"quantidade_disponivel": 100,
-	"data_evento": "2026-10-20"
-}
-```
+**Tipos validos:** `Individual`, `Duo`, `Caravana`
 
-**GET** `/api/v1/tickets?limit=50&offset=0`
+#### `GET /api/v1/tickets?limit=50&offset=0`
 
-Lista tickets paginados.
+Lista tickets com paginacao.
 
-**GET** `/api/v1/tickets/:id`
+#### `GET /api/v1/tickets/:id`
 
-Busca ticket por ID.
+Busca um ticket pelo ID.
 
-**PUT** `/api/v1/tickets/:id`
+#### `PUT /api/v1/tickets/:id`
 
-Atualiza campos (envie apenas os que quer alterar).
+Atualiza um ticket.
 
-**Request JSON**
-```json
-{
-	"descricao": "Entrada padrao (lote 2)",
-	"preco": "150.00"
-}
-```
-
-**DELETE** `/api/v1/tickets/:id`
+#### `DELETE /api/v1/tickets/:id`
 
 Remove um ticket.
 
 ---
 
-### Tickets por compra
+### Tickets Compra
 
-**POST** `/api/v1/tickets-compra`
+#### `POST /api/v1/tickets-compra`
 
-Cria um vinculo entre usuario e ticket (status default: `Pendente`).
+Cria um vinculo de compra de ticket.
 
-**Request JSON**
+**Request:**
 ```json
 {
-	"usuario_id": 1,
-	"ticket_id": 10,
-	"quantidade": 1,
-	"status": "Pendente"
+  "usuario_id": 1,
+  "ticket_id": 1,
+  "quantidade": 1,
+  "status": "Pendente"
 }
 ```
 
-**GET** `/api/v1/tickets-compra/:id`
+#### `GET /api/v1/tickets-compra/:id`
 
-Busca vinculo por ID.
+Busca uma compra pelo ID.
 
-**GET** `/api/v1/usuarios/:id/tickets-compra?limit=50&offset=0`
+#### `GET /api/v1/usuarios/:id/tickets-compra?limit=50&offset=0`
 
-Lista tickets do usuario.
+Lista compras de um usuario.
 
-**PATCH** `/api/v1/tickets-compra/:id/status`
+#### `PATCH /api/v1/tickets-compra/:id/status`
 
-Atualiza apenas o status.
+Atualiza o status de uma compra.
 
-**Request JSON**
+**Request:**
 ```json
 {
-	"status": "Pago"
+  "status": "Pago"
 }
 ```
 
-**DELETE** `/api/v1/tickets-compra/:id`
+**Status validos:** `Pendente`, `Pago`, `Cancelado`, `Reembolsado`
 
-Remove o vinculo.
+#### `DELETE /api/v1/tickets-compra/:id`
+
+Remove uma compra.
 
 ---
 
-### Pagamentos e estornos
+### Pagamentos
 
-O pagamento e registrado automaticamente quando o webhook do Mercado Pago confirma `approved`.
-Nao existe endpoint publico para criacao manual de pagamento.
+#### `POST /api/v1/pagamentos/checkout`
 
-Estornos sao registrados no dominio com transacao e devem manter consistencia com o ticket da compra.
-Se for expor um endpoint de estorno, use transacao e registre auditoria.
+Cria um checkout no Mercado Pago e persiste o ticket como pendente.
 
----
-
-### Consulta de pagamentos
-
-**GET** `/api/v1/pagamentos?usuario_id=1&status=Pago&data_inicio=2026-01-01&data_fim=2026-12-31&limit=50&offset=0`
-
-Lista pagamentos por usuario com filtros opcionais.
-
-**Query params**
-- `usuario_id` (obrigatorio): um ou mais IDs (separados por virgula).
-- `status` (opcional): `Pendente`, `Pago`, `Cancelado`, `Reembolsado`.
-- `data_inicio` (opcional): data no formato `YYYY-MM-DD`.
-- `data_fim` (opcional): data no formato `YYYY-MM-DD`.
-- `limit` (opcional): default 50.
-- `offset` (opcional): default 0.
-
----
-
-## Teste rapido de compra (Checkout Pro)
-
-Passo a passo com apenas os endpoints necessarios para criar usuario e ticket, gerar o checkout e finalizar a compra.
-
-### 1) Criar usuario
-
-**POST** `/api/v1/pessoas`
-
-**Request JSON**
+**Request:**
 ```json
 {
-	"nome": "Teste Compra",
-	"tipo_usuario": "Usuario",
-	"senha": "hash_da_senha",
-	"cpf": "40402519890",
-	"idade": 30,
-	"celular": "+55 11 99999-0001",
-	"igreja": "Igreja Teste",
-	"papel_igreja": "Membro",
-	"estado_civil": "Solteiro(a)",
-	"email": "teste.compra@exemplo.com",
-	"sexo": "Masculino",
-	"cidade": "Sao Paulo",
-	"estado_uf": "SP",
-	"escolaridade": "Ensino Superior Completo"
+  "usuario_id": 1,
+  "ticket_id": 1,
+  "quantidade": 1,
+  "beneficiados": [
+    {
+      "nome": "Beneficiado 1",
+      "cpf": "12345678909",
+      "idade": 29,
+      "celular": "+55 11 99999-0001",
+      "igreja": "Igreja Central",
+      "papel_igreja": "Membro",
+      "estado_civil": "Solteiro(a)",
+      "email": "beneficiado1@exemplo.com",
+      "sexo": "Masculino",
+      "cidade": "Sao Paulo",
+      "estado_uf": "SP",
+      "escolaridade": "Ensino Superior Completo"
+    }
+  ],
+  "success_url": "https://seu-site.com/sucesso",
+  "failure_url": "https://seu-site.com/erro",
+  "pending_url": "https://seu-site.com/pendente"
 }
 ```
 
-Guarde o `id` retornado para usar como `usuario_id`.
+A quantidade de beneficiados deve corresponder ao tipo do ticket:
+- **Individual:** 1 beneficiado por unidade
+- **Duo:** 2 beneficiados por unidade
+- **Caravana:** 10 beneficiados por unidade
 
-### 2) Criar ticket
-
-**POST** `/api/v1/tickets`
-
-**Request JSON**
+**Response:**
 ```json
 {
-	"tipo": "Individual",
-	"nome": "Ingresso Teste",
-	"descricao": "Entrada para teste rapido",
-	"preco": "10.00",
-	"quantidade_disponivel": 10,
-	"data_evento": "2026-10-20"
+  "preference_id": "123456789-abc...",
+  "init_point": "https://www.mercadopago.com.br/...",
+  "sandbox_init_point": "https://sandbox.mercadopago.com.br/...",
+  "ticket_compra_id": 1
 }
 ```
 
-Guarde o `id` retornado para usar como `ticket_id`.
+#### `POST /api/v1/pagamentos/webhook`
 
-### 3) Criar Checkout Pro
+Recebe notificacoes de pagamento do Mercado Pago. Processa automaticamente pagamentos aprovados, atualizando o status do ticket para `Pago`.
 
-**POST** `/api/v1/pagamentos/checkout`
+#### `GET /api/v1/pagamentos?usuario_id=1&status=Pago&limit=50&offset=0`
 
-**Request JSON**
-```json
-{
-	"usuario_id": 1,
-	"ticket_id": 2,
-	"quantidade": 1,
-	"beneficiados": [
-		{
-			"nome": "Beneficiado 1",
-			"cpf": "12345678901",
-			"idade": 29,
-			"celular": "+55 11 99999-0001",
-			"igreja": "Igreja Central",
-			"papel_igreja": "Membro",
-			"estado_civil": "Solteiro(a)",
-			"email": "beneficiado1@exemplo.com",
-			"sexo": "Feminino",
-			"cidade": "Sao Paulo",
-			"estado_uf": "SP",
-			"escolaridade": "Ensino Superior Completo"
-		}
-	],
-	"success_url": "https://seu-site.com/checkout/sucesso",
-	"failure_url": "https://seu-site.com/checkout/erro",
-	"pending_url": "https://seu-site.com/checkout/pendente"
-}
-```
+Lista pagamentos com filtros opcionais.
 
-Use os IDs retornados nos passos 1 e 2. Copie o `init_point` da resposta.
-
-### 4) Abrir o Checkout Pro
-
-- Abra o `init_point` em uma aba anonima.
-- Faca login com:
-  - usuario: `TESTUSER4040251989076800435`
-  - senha: `u1y8ImOFiV`
-  - codigo de verificacao: `672106` (caso seja solicitado algum codigo de email)
-
-Se apos logar nao for redirecionado para a compra, abra novamente o link do `init_point`.
-
-### 5) Finalizar o pagamento
-
-- Use qualquer opcao de cartao de credito ou saldo.
-- Se usar cartao e for solicitado:
-  - senha de seguranca: `123`
-  - validade: `11/30`
+**Parametros:**
+| Parametro | Descricao |
+|---|---|
+| `usuario_id` | Obrigatorio. IDs separados por virgula |
+| `status` | `Pendente`, `Pago`, `Cancelado`, `Reembolsado` |
+| `data_inicio` | Data ISO 8601 |
+| `data_fim` | Data ISO 8601 |
+| `limit` | Padrao 50 |
+| `offset` | Padrao 0 |
 
 ---
 
-## Auditoria
+### Estornos
 
-Os eventos relevantes de usuarios, tickets e pagamentos sao registrados no arquivo definido por `AUDIT_LOG_PATH`
-(padrao: `logs/audit.log`).
+#### `POST /api/v1/pagamentos/:id/estornos`
 
-Regras de seguranca na auditoria:
-- CPF e mascarado.
-- Tokens sao registrados apenas com os 2 ultimos caracteres.
-- Senhas nunca sao registradas.
+Cria um estorno (reembolso) via Mercado Pago e atualiza o ticket para `Reembolsado`.
+
+**Request:**
+```json
+{
+  "motivo": "cancelamento",
+  "valor": "120.00"
+}
+```
+
+O campo `valor` e opcional — se omitido, faz estorno total.
+
+---
+
+## Integracao com Flutter
+
+### Fluxo de autenticacao
+
+1. O app envia `POST /api/v1/auth/login` com CPF e senha
+2. Em caso de sucesso, armazena o `token` (ex: com `flutter_secure_storage`)
+3. As chamadas autenticadas devem incluir o header `Authorization: Bearer <token>`
+4. No logout, envia `POST /api/v1/auth/logout` com o header `Authorization`
+
+### Exemplo Dart (http)
+
+```dart
+// Login
+final response = await http.post(
+  Uri.parse('$baseUrl/api/v1/auth/login'),
+  headers: {'Content-Type': 'application/json'},
+  body: jsonEncode({'cpf': cpf, 'senha': senha}),
+);
+
+if (response.statusCode == 200) {
+  final data = jsonDecode(response.body);
+  final token = data['token'];
+  // armazenar token
+}
+
+// Logout
+await http.post(
+  Uri.parse('$baseUrl/api/v1/auth/logout'),
+  headers: {'Authorization': 'Bearer $token'},
+);
+// remover token do armazenamento local
+```
