@@ -53,7 +53,12 @@ func NewRouter(deps AppDeps) *gin.Engine {
 	pagamentos.POST("/checkout", authMiddleware, controller.NewPagamentoController(deps.DB, deps.MP).CreateCheckout)
 	pagamentos.GET("", controller.NewPagamentoController(deps.DB, deps.MP).ListPayments)
 	pagamentos.POST("/webhook", controller.NewPagamentoController(deps.DB, deps.MP).HandleWebhook)
-	pagamentos.POST("/:id/estornos", authMiddleware, controller.NewEstornoController(deps.DB, deps.MP).Create)
+
+	estornoController := controller.NewEstornoController(deps.DB, deps.MP)
+	api.GET("/estornos", estornoController.List)
+	api.GET("/estornos/:id", estornoController.GetByID)
+	api.GET("/pagamentos/:id/estornos", estornoController.ListByPagamentoID)
+	pagamentos.POST("/:id/estornos", authMiddleware, estornoController.Create)
 
 	return r
 }

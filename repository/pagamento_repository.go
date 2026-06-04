@@ -23,11 +23,11 @@ func (r *PagamentoRepository) Create(ctx context.Context, pagamento *model.Pagam
 	return mapGormErr(r.db.WithContext(ctx).Create(pagamento).Error)
 }
 
-// GetByID busca um pagamento pelo ID.
+// GetByID busca um pagamento pelo ID, incluindo TicketCompra e Ticket.
 func (r *PagamentoRepository) GetByID(ctx context.Context, id uint64) (model.Pagamento, error) {
 	var pagamento model.Pagamento
 	err := r.db.WithContext(ctx).
-		Preload("TicketCompra").
+		Preload("TicketCompra.Ticket").
 		First(&pagamento, id).Error
 	return pagamento, mapGormErr(err)
 }

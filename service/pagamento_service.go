@@ -102,7 +102,13 @@ func (s *PagamentoService) CriarCheckout(ctx context.Context, req CheckoutReques
 	if err != nil {
 		return CheckoutResponse{}, err
 	}
-	quantidadeBeneficiarios := int(unidadesPorTicket * quantidade)
+	quantidadeTotal := unidadesPorTicket * quantidade
+
+	if ticket.QuantidadeDisponivel < quantidadeTotal {
+		return CheckoutResponse{}, repository.ErrTicketIndisponivel
+	}
+
+	quantidadeBeneficiarios := int(quantidadeTotal)
 	beneficiados, err := normalizarBeneficiados(req.Beneficiados, quantidadeBeneficiarios)
 	if err != nil {
 		return CheckoutResponse{}, err

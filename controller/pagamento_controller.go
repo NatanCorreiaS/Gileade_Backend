@@ -126,6 +126,10 @@ func (c *PagamentoController) CreateCheckout(ctx *gin.Context) {
 			ctx.JSON(http.StatusBadRequest, gin.H{"erro": "beneficiados invalidos"})
 			return
 		}
+		if errors.Is(err, repository.ErrTicketIndisponivel) {
+			ctx.JSON(http.StatusConflict, gin.H{"erro": "tickets indisponiveis para a quantidade solicitada"})
+			return
+		}
 		if errors.Is(err, service.ErrNotificationURLObrigatoria) {
 			ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "notification_url nao configurado"})
 			return

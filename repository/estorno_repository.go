@@ -22,6 +22,25 @@ func (r *EstornoRepository) Create(ctx context.Context, estorno *model.Estorno) 
 	return mapGormErr(r.db.WithContext(ctx).Create(estorno).Error)
 }
 
+// List lista estornos com paginacao simples.
+func (r *EstornoRepository) List(ctx context.Context, limit, offset int) ([]model.Estorno, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	var estornos []model.Estorno
+	err := r.db.WithContext(ctx).
+		Preload("Pagamento").
+		Order("id asc").
+		Limit(limit).
+		Offset(offset).
+		Find(&estornos).Error
+	return estornos, mapGormErr(err)
+}
+
 // GetByID busca um estorno pelo ID.
 func (r *EstornoRepository) GetByID(ctx context.Context, id uint64) (model.Estorno, error) {
 	var estorno model.Estorno
