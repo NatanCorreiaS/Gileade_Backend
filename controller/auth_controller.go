@@ -3,7 +3,6 @@ package controller
 import (
 	"errors"
 	"net/http"
-	"strings"
 
 	"gileade/gileade_backend/audit"
 	"gileade/gileade_backend/service"
@@ -101,17 +100,4 @@ func (c *AuthController) Logout(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"mensagem": "logout realizado"})
 }
 
-// extractBearerToken extrai o token do header Authorization.
-func extractBearerToken(ctx *gin.Context) string {
-	authHeader := ctx.GetHeader("Authorization")
-	if authHeader == "" {
-		return ""
-	}
 
-	parts := strings.SplitN(authHeader, " ", 2)
-	if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-		return ""
-	}
-
-	return strings.TrimSpace(parts[1])
-}

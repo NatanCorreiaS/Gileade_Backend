@@ -20,6 +20,8 @@ Content-Type: application/json
 	"estado_uf": "SP",
 	"escolaridade": "Ensino Superior Completo"
 }
+### GET tickets
+GET  {{base}}/tickets
 
 ### 2) Criar ticket Individual (guarde o id)
 POST {{base}}/tickets

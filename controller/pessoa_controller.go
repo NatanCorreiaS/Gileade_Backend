@@ -28,7 +28,6 @@ func NewPessoaController(db *gorm.DB) *PessoaController {
 
 type PessoaCreateRequest struct {
 	Nome         string             `json:"nome" binding:"required"`
-	TipoUsuario  model.TipoUsuario  `json:"tipo_usuario" binding:"required"`
 	Senha        string             `json:"senha" binding:"required"`
 	CPF          string             `json:"cpf" binding:"required"`
 	Idade        int16              `json:"idade"`
@@ -87,13 +86,14 @@ func (c *PessoaController) RegisterRoutes(rg *gin.RouterGroup) {
 }
 
 // Create cadastra uma pessoa no sistema.
+// Usuarios nao autenticados ou comuns sao sempre criados como "Usuario".
+// Admins autenticados podem criar usuarios com qualquer cargo.
 func (c *PessoaController) Create(ctx *gin.Context) {
 	var req PessoaCreateRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		audit.GetLogger().LogEvent("pessoa_criar", false, map[string]any{
-			"nome":         req.Nome,
-			"cpf":          req.CPF,
-			"tipo_usuario": req.TipoUsuario,
+			"nome": req.Nome,
+			"cpf":  req.CPF,
 		}, err)
 		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "payload invalido"})
 		return
@@ -102,17 +102,18 @@ func (c *PessoaController) Create(ctx *gin.Context) {
 	senhaHash, err := c.authService.HashPassword(req.Senha)
 	if err != nil {
 		audit.GetLogger().LogEvent("pessoa_criar", false, map[string]any{
-			"nome":         req.Nome,
-			"cpf":          req.CPF,
-			"tipo_usuario": req.TipoUsuario,
+			"nome": req.Nome,
+			"cpf":  req.CPF,
 		}, err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"erro": "falha ao processar senha"})
 		return
 	}
 
+	tipoUsuario := model.TipoUsuarioUsuario
+
 	pessoa := model.Pessoa{
 		Nome:         req.Nome,
-		TipoUsuario:  req.TipoUsuario,
+		TipoUsuario:  tipoUsuario,
 		Senha:        senhaHash,
 		CPF:          req.CPF,
 		Idade:        req.Idade,
@@ -193,18 +194,17 @@ func (c *PessoaController) GetByID(ctx *gin.Context) {
 }
 
 // Update atualiza dados de uma pessoa.
+// Usuarios comuns so podem alterar seus proprios dados e nao podem alterar o cargo.
+// Admins podem alterar qualquer usuario, inclusive o cargo (tipo_usuario).
 func (c *PessoaController) Update(ctx *gin.Context) {
 	id, ok := parseUintParam(ctx, "id")
 	if !ok {
 		return
 	}
 
-	var req PessoaUpdateRequest
-	if err := ctx.ShouldBindJSON(&req); err != nil {
-		audit.GetLogger().LogEvent("pessoa_atualizar", false, map[string]any{
-			"pessoa_id": id,
-		}, err)
-		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "payload invalido"})
+	authID, isAuth := GetAuthUsuarioID(ctx)
+	if !isAuth {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"erro": "autenticacao necessaria"})
 		return
 	}
 
@@ -217,10 +217,39 @@ func (c *PessoaController) Update(ctx *gin.Context) {
 		return
 	}
 
+	eAdmin := IsAdmin(ctx)
+
+	if !eAdmin && authID != pessoa.ID {
+		audit.GetLogger().LogEvent("pessoa_atualizar", false, map[string]any{
+			"pessoa_id":     id,
+			"solicitante_id": authID,
+		}, nil)
+		ctx.JSON(http.StatusForbidden, gin.H{"erro": "voce so pode alterar seus proprios dados"})
+		return
+	}
+
+	var req PessoaUpdateRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		audit.GetLogger().LogEvent("pessoa_atualizar", false, map[string]any{
+			"pessoa_id": id,
+		}, err)
+		ctx.JSON(http.StatusBadRequest, gin.H{"erro": "payload invalido"})
+		return
+	}
+
+	if req.TipoUsuario != nil && !eAdmin {
+		audit.GetLogger().LogEvent("pessoa_atualizar", false, map[string]any{
+			"pessoa_id":     pessoa.ID,
+			"solicitante_id": authID,
+		}, nil)
+		ctx.JSON(http.StatusForbidden, gin.H{"erro": "apenas administradores podem alterar o cargo"})
+		return
+	}
+
 	if req.Nome != nil {
 		pessoa.Nome = *req.Nome
 	}
-	if req.TipoUsuario != nil {
+	if req.TipoUsuario != nil && eAdmin {
 		pessoa.TipoUsuario = *req.TipoUsuario
 	}
 	if req.Senha != nil {
@@ -292,9 +321,23 @@ func (c *PessoaController) Update(ctx *gin.Context) {
 }
 
 // Delete remove uma pessoa pelo ID.
+// Apenas admins podem remover usuarios. Usuarios comuns nao podem remover contas.
 func (c *PessoaController) Delete(ctx *gin.Context) {
 	id, ok := parseUintParam(ctx, "id")
 	if !ok {
+		return
+	}
+
+	authID, isAuth := GetAuthUsuarioID(ctx)
+	if !isAuth {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"erro": "autenticacao necessaria"})
+		return
+	}
+
+	eAdmin := IsAdmin(ctx)
+
+	if !eAdmin && authID != id {
+		ctx.JSON(http.StatusForbidden, gin.H{"erro": "voce so pode remover sua propria conta ou ser um administrador"})
 		return
 	}
 
