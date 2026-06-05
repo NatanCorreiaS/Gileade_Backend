@@ -222,11 +222,4 @@ Content-Type: application/json
 
 {}
 
-### Estornos - criar estorno por pagamento
-POST {{base}}/pagamentos/1/estornos
-Content-Type: application/json
-
-{
-	"motivo": "cancelamento",
-	"valor": "120.00"
-}
+###

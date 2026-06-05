@@ -14,6 +14,5 @@ func AutoMigrate(db *gorm.DB) error {
 		&TicketDuo{},
 		&TicketCaravana{},
 		&Pagamento{},
-		&Estorno{},
 	)
 }

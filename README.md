@@ -74,9 +74,6 @@ Rotas de leitura (GET) sao publicas.
 | Criar ticket-compra | Sim (apenas para si) | Sim |
 | Alterar status ticket-compra | Nao | Sim |
 | Criar checkout | Sim | Sim |
-| Criar estorno (compra propria, nos prazos) | Sim | Sim |
-| Criar estorno (qualquer compra, sem prazo) | Nao | Sim |
-| Listar/consultar estornos | Sim | Sim |
 
 ### Cargos (tipo_usuario)
 
@@ -452,71 +449,6 @@ Lista pagamentos com filtros opcionais.
 | `data_fim` | Data ISO 8601 |
 | `limit` | Padrao 50 |
 | `offset` | Padrao 0 |
-
----
-
-### Estornos
-
-#### `GET /api/v1/estornos?limit=50&offset=0` *(publico)*
-
-Lista todos os estornos com paginacao.
-
-#### `GET /api/v1/estornos/:id` *(publico)*
-
-Busca um estorno pelo ID.
-
-**Response:**
-```json
-{
-  "id": 1,
-  "pagamento_id": 5,
-  "id_transacao_estorno": "987654321",
-  "valor": "120.00",
-  "motivo": "cancelamento"
-}
-```
-
-#### `GET /api/v1/pagamentos/:id/estornos?limit=50&offset=0` *(publico)*
-
-Lista estornos de um pagamento especifico.
-
-#### `POST /api/v1/pagamentos/:id/estornos` *(autenticado)*
-
-Cria um estorno (reembolso) via Mercado Pago e atualiza o ticket para `Reembolsado`.
-A quantidade de tickets e automaticamente restaurada.
-
-**Regras de estorno:**
-
-| Perfil | Condicoes |
-|---|---|
-| **Admin** | Pode estornar qualquer pagamento, a qualquer momento |
-| **Usuario** | Apenas compras proprias. Deve atender **ambos** os prazos: |
-| | - Ate **7 dias** apos a data do pagamento |
-| | - Ate **5 dias antes** da data do evento |
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Request:**
-```json
-{
-  "motivo": "cancelamento",
-  "valor": "120.00"
-}
-```
-
-O campo `valor` e opcional — se omitido, faz estorno total.
-
-**Erros:**
-| Status | Mensagem |
-|---|---|
-| `401` | `autenticacao necessaria` |
-| `403` | `voce so pode estornar suas proprias compras` |
-| `403` | `prazo de 7 dias apos a compra excedido` |
-| `403` | `estorno permitido apenas ate 5 dias antes do evento` |
-| `404` | `pagamento nao encontrado` |
 
 ---
 

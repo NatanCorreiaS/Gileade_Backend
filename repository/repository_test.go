@@ -271,8 +271,8 @@ func TestTicketCompraRepository(t *testing.T) {
 	}
 }
 
-// TestPagamentoAndEstornoRepositories valida fluxo de pagamento e estorno.
-func TestPagamentoAndEstornoRepositories(t *testing.T) {
+// TestPagamentoRepository valida fluxo de pagamento.
+func TestPagamentoRepository(t *testing.T) {
 	tdb := testutil.StartPostgres(t)
 	if err := model.AutoMigrate(tdb.DB); err != nil {
 		t.Fatalf("AutoMigrate: %v", err)
@@ -284,18 +284,16 @@ func TestPagamentoAndEstornoRepositories(t *testing.T) {
 	tRepo := repository.NewTicketRepository(tdb.DB)
 	tcRepo := repository.NewTicketCompraRepository(tdb.DB)
 	payRepo := repository.NewPagamentoRepository(tdb.DB)
-	estRepo := repository.NewEstornoRepository(tdb.DB)
 
 	cases := []struct {
 		name       string
 		txID       string
-		estornoTx  string
 		metodoNovo model.MetodoPagamento
 		cpf        string
 		email      string
 	}{
-		{name: "fluxo-1", txID: "tx-001", estornoTx: "st-001", metodoNovo: model.MetodoPagamentoBoleto, cpf: "00000000200", email: "ciclano1@example.com"},
-		{name: "fluxo-2", txID: "tx-002", estornoTx: "st-002", metodoNovo: model.MetodoPagamentoCartaoCredito, cpf: "00000000201", email: "ciclano2@example.com"},
+		{name: "fluxo-1", txID: "tx-001", metodoNovo: model.MetodoPagamentoBoleto, cpf: "00000000200", email: "ciclano1@example.com"},
+		{name: "fluxo-2", txID: "tx-002", metodoNovo: model.MetodoPagamentoCartaoCredito, cpf: "00000000201", email: "ciclano2@example.com"},
 	}
 
 	for _, tcCase := range cases {
@@ -389,69 +387,10 @@ func TestPagamentoAndEstornoRepositories(t *testing.T) {
 				t.Fatalf("ticket compra mismatch")
 			}
 
-			estorno := model.Estorno{
-				PagamentoID:        pagamento.ID,
-				IDTransacaoEstorno: tcCase.estornoTx,
-				Valor:              decimal.NewFromFloat(15.00),
-				Motivo:             "teste",
-				DataEstorno:        time.Now().UTC(),
-			}
-			if err := estRepo.CreateAndMarkTicketReembolsado(ctx, &estorno); err != nil {
-				t.Fatalf("CreateAndMarkTicketReembolsado: %v", err)
-			}
-
-			gotTicketEstorno, err := tRepo.GetByID(ctx, ticket.ID)
-			if err != nil {
-				t.Fatalf("GetByID ticket estorno: %v", err)
-			}
-			if gotTicketEstorno.QuantidadeDisponivel != quantidadeInicial {
-				t.Fatalf("quantidade_disponivel nao restaurada no estorno")
-			}
-
-			gotTC2, err := tcRepo.GetByID(ctx, compra.ID)
-			if err != nil {
-				t.Fatalf("GetByID tc after estorno: %v", err)
-			}
-			if gotTC2.Status != model.TicketsStatusReembolsado {
-				t.Fatalf("expected status Reembolsado")
-			}
-
-			gotEstTx, err := estRepo.GetByIDTransacaoEstorno(ctx, tcCase.estornoTx)
-			if err != nil {
-				t.Fatalf("GetByIDTransacaoEstorno: %v", err)
-			}
-			if gotEstTx.ID == 0 {
-				t.Fatalf("expected estorno ID")
-			}
-
-			listEst, err := estRepo.ListByPagamentoID(ctx, pagamento.ID, 10, 0)
-			if err != nil {
-				t.Fatalf("ListByPagamentoID: %v", err)
-			}
-			if len(listEst) != 1 {
-				t.Fatalf("expected 1 estorno")
-			}
-
-			gotEst, err := estRepo.GetByID(ctx, estorno.ID)
-			if err != nil {
-				t.Fatalf("GetByID estorno: %v", err)
-			}
-			if gotEst.PagamentoID != pagamento.ID {
-				t.Fatalf("pagamento mismatch")
-			}
-
-			// Cobertura de Update e Deletes simples.
+			// Cobertura de Update e Delete.
 			pagamento.Metodo = tcCase.metodoNovo
 			if err := payRepo.Update(ctx, &pagamento); err != nil {
 				t.Fatalf("Update pagamento: %v", err)
-			}
-
-			if err := estRepo.Delete(ctx, estorno.ID); err != nil {
-				t.Fatalf("Delete estorno: %v", err)
-			}
-			_, err = estRepo.GetByID(ctx, estorno.ID)
-			if !errors.Is(err, repository.ErrNotFound) {
-				t.Fatalf("expected ErrNotFound for estorno, got %v", err)
 			}
 
 			if err := payRepo.Delete(ctx, pagamento.ID); err != nil {

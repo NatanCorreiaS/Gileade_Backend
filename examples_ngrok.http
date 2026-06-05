@@ -306,9 +306,5 @@ Content-Type: application/json
 	}
 }
 
-{
-	"status": "Reembolsado"
-}
-
 ### Tickets-compra - remover
 DELETE {{base}}/tickets-compra/1

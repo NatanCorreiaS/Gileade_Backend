@@ -15,7 +15,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/mercadopago/sdk-go/pkg/payment"
 	"github.com/mercadopago/sdk-go/pkg/preference"
-	"github.com/mercadopago/sdk-go/pkg/refund"
 	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
@@ -64,7 +63,6 @@ type PagamentoService struct {
 	tcRepo  *repository.TicketCompraRepository
 	bRepo   *repository.BeneficiadoRepository
 	payRepo *repository.PagamentoRepository
-	estRepo *repository.EstornoRepository
 	gw      *gateway.MercadoPagoGateway
 }
 
@@ -76,7 +74,6 @@ func NewPagamentoService(db *gorm.DB, gw *gateway.MercadoPagoGateway) *Pagamento
 		tcRepo:  repository.NewTicketCompraRepository(db),
 		bRepo:   repository.NewBeneficiadoRepository(db),
 		payRepo: repository.NewPagamentoRepository(db),
-		estRepo: repository.NewEstornoRepository(db),
 		gw:      gw,
 	}
 }
@@ -306,45 +303,6 @@ func (s *PagamentoService) SearchPayments(ctx context.Context, req payment.Searc
 	return s.gw.SearchPayments(ctx, req)
 }
 
-func (s *PagamentoService) CriarEstornoPorPagamentoID(ctx context.Context, pagamentoID uint64, motivo string, valor *decimal.Decimal) (model.Estorno, error) {
-	pagamento, err := s.payRepo.GetByID(ctx, pagamentoID)
-	if err != nil {
-		return model.Estorno{}, err
-	}
-
-	paymentID, err := strconv.Atoi(pagamento.IDTransacao)
-	if err != nil {
-		return model.Estorno{}, fmt.Errorf("id_transacao invalido")
-	}
-
-	refundResp, err := s.criarRefund(ctx, paymentID, valor)
-	if err != nil {
-		return model.Estorno{}, err
-	}
-
-	dataEstorno := time.Now().UTC()
-	if !refundResp.DateCreated.IsZero() {
-		dataEstorno = refundResp.DateCreated
-	}
-
-	estorno := model.Estorno{
-		PagamentoID:        pagamento.ID,
-		IDTransacaoEstorno: fmt.Sprintf("%d", refundResp.ID),
-		Valor:              decimal.NewFromFloat(refundResp.Amount),
-		Motivo:             motivo,
-		DataEstorno:        dataEstorno,
-	}
-
-	if err := s.estRepo.CreateAndMarkTicketReembolsado(ctx, &estorno); err != nil {
-		if isUniqueViolation(err) {
-			return estorno, nil
-		}
-		return model.Estorno{}, err
-	}
-
-	return estorno, nil
-}
-
 func unidadesPorTicket(tipo model.TipoTicket) (uint64, error) {
 	switch tipo {
 	case model.TipoTicketIndividual, "":
@@ -355,6 +313,19 @@ func unidadesPorTicket(tipo model.TipoTicket) (uint64, error) {
 		return 10, nil
 	default:
 		return 0, repository.ErrTipoTicketInvalido
+	}
+}
+
+func mapMetodoPagamento(paymentTypeID string) model.MetodoPagamento {
+	switch paymentTypeID {
+	case "credit_card", "debit_card":
+		return model.MetodoPagamentoCartaoCredito
+	case "ticket":
+		return model.MetodoPagamentoBoleto
+	case "pix":
+		return model.MetodoPagamentoPix
+	default:
+		return model.MetodoPagamentoPix
 	}
 }
 
@@ -495,61 +466,6 @@ func buildTicketsCaravana(tc model.TicketCompra, ticket model.Ticket, beneficiad
 		})
 	}
 	return caravanas, nil
-}
-
-func (s *PagamentoService) CriarEstornoPorPaymentID(ctx context.Context, paymentID int, motivo string, valor *decimal.Decimal) (model.Estorno, error) {
-	pagamento, err := s.payRepo.GetByIDTransacao(ctx, fmt.Sprintf("%d", paymentID))
-	if err != nil {
-		return model.Estorno{}, err
-	}
-
-	refundResp, err := s.criarRefund(ctx, paymentID, valor)
-	if err != nil {
-		return model.Estorno{}, err
-	}
-
-	dataEstorno := time.Now().UTC()
-	if !refundResp.DateCreated.IsZero() {
-		dataEstorno = refundResp.DateCreated
-	}
-
-	estorno := model.Estorno{
-		PagamentoID:        pagamento.ID,
-		IDTransacaoEstorno: fmt.Sprintf("%d", refundResp.ID),
-		Valor:              decimal.NewFromFloat(refundResp.Amount),
-		Motivo:             motivo,
-		DataEstorno:        dataEstorno,
-	}
-
-	if err := s.estRepo.CreateAndMarkTicketReembolsado(ctx, &estorno); err != nil {
-		if isUniqueViolation(err) {
-			return estorno, nil
-		}
-		return model.Estorno{}, err
-	}
-
-	return estorno, nil
-}
-
-func (s *PagamentoService) criarRefund(ctx context.Context, paymentID int, valor *decimal.Decimal) (*refund.Response, error) {
-	if valor != nil {
-		floatVal, _ := valor.Float64()
-		return s.gw.CreatePartialRefund(ctx, paymentID, floatVal)
-	}
-	return s.gw.CreateRefund(ctx, paymentID)
-}
-
-func mapMetodoPagamento(paymentTypeID string) model.MetodoPagamento {
-	switch paymentTypeID {
-	case "credit_card", "debit_card":
-		return model.MetodoPagamentoCartaoCredito
-	case "ticket":
-		return model.MetodoPagamentoBoleto
-	case "pix":
-		return model.MetodoPagamentoPix
-	default:
-		return model.MetodoPagamentoPix
-	}
 }
 
 func isUniqueViolation(err error) bool {

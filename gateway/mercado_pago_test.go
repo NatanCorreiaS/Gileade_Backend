@@ -129,7 +129,7 @@ func TestGatewayCreateCheckoutPro(t *testing.T) {
 	prefClient := &fakePreferenceClient{createResp: prefResp}
 	payClient := &fakePaymentClient{}
 
-	gw, err := NewMercadoPagoGateway(cfg, prefClient, payClient, nil)
+	gw, err := NewMercadoPagoGateway(cfg, prefClient, payClient)
 	if err != nil {
 		t.Fatalf("NewMercadoPagoGateway: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestGatewayGetPayment(t *testing.T) {
 	prefClient := &fakePreferenceClient{}
 	payClient := &fakePaymentClient{getResp: payResp}
 
-	gw, err := NewMercadoPagoGateway(cfg, prefClient, payClient, nil)
+	gw, err := NewMercadoPagoGateway(cfg, prefClient, payClient)
 	if err != nil {
 		t.Fatalf("NewMercadoPagoGateway: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestGatewayGetPayment(t *testing.T) {
 
 // TestNewMercadoPagoGatewayWithNilConfig valida erro para config nula.
 func TestNewMercadoPagoGatewayWithNilConfig(t *testing.T) {
-	if _, err := NewMercadoPagoGateway(nil, nil, nil, nil); err == nil {
+	if _, err := NewMercadoPagoGateway(nil, nil, nil); err == nil {
 		t.Fatalf("expected error")
 	}
 }

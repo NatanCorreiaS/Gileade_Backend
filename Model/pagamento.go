@@ -19,8 +19,6 @@ type Pagamento struct {
 
 	Metodo        MetodoPagamento `gorm:"type:text;not null" json:"metodo"`
 	DataPagamento time.Time       `gorm:"type:timestamp;not null" json:"data_pagamento"`
-
-	Estornos []Estorno `gorm:"foreignKey:PagamentoID" json:"estornos,omitempty"`
 }
 
 // TableName define o nome da tabela para Pagamento.

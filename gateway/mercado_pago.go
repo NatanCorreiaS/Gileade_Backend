@@ -9,18 +9,16 @@ import (
 	"github.com/mercadopago/sdk-go/pkg/config"
 	"github.com/mercadopago/sdk-go/pkg/payment"
 	"github.com/mercadopago/sdk-go/pkg/preference"
-	"github.com/mercadopago/sdk-go/pkg/refund"
 )
 
 type MercadoPagoGateway struct {
 	cfg        *config.Config
 	preference preference.Client
 	payment    payment.Client
-	refund     refund.Client
 }
 
 // NewMercadoPagoGateway monta o gateway com clientes configurados.
-func NewMercadoPagoGateway(cfg *config.Config, pref preference.Client, pay payment.Client, ref refund.Client) (*MercadoPagoGateway, error) {
+func NewMercadoPagoGateway(cfg *config.Config, pref preference.Client, pay payment.Client) (*MercadoPagoGateway, error) {
 	if cfg == nil {
 		return nil, errors.New("config Mercado Pago inválida")
 	}
@@ -30,15 +28,11 @@ func NewMercadoPagoGateway(cfg *config.Config, pref preference.Client, pay payme
 	if pay == nil {
 		pay = payment.NewClient(cfg)
 	}
-	if ref == nil {
-		ref = refund.NewClient(cfg)
-	}
 
 	return &MercadoPagoGateway{
 		cfg:        cfg,
 		preference: pref,
 		payment:    pay,
-		refund:     ref,
 	}, nil
 }
 
@@ -54,7 +48,7 @@ func NewMercadoPagoGatewayFromEnv() (*MercadoPagoGateway, error) {
 		return nil, fmt.Errorf("falha ao criar configuração do Mercado Pago: %w", err)
 	}
 
-	return NewMercadoPagoGateway(cfg, nil, nil, nil)
+	return NewMercadoPagoGateway(cfg, nil, nil)
 }
 
 // CreateCheckoutPro cria a preferencia de checkout no Mercado Pago.
@@ -70,14 +64,4 @@ func (g *MercadoPagoGateway) GetPayment(ctx context.Context, id int) (*payment.R
 // SearchPayments busca pagamentos no Mercado Pago.
 func (g *MercadoPagoGateway) SearchPayments(ctx context.Context, req payment.SearchRequest) (*payment.SearchResponse, error) {
 	return g.payment.Search(ctx, req)
-}
-
-// CreateRefund solicita estorno total de um pagamento.
-func (g *MercadoPagoGateway) CreateRefund(ctx context.Context, paymentID int) (*refund.Response, error) {
-	return g.refund.Create(ctx, paymentID)
-}
-
-// CreatePartialRefund solicita estorno parcial de um pagamento.
-func (g *MercadoPagoGateway) CreatePartialRefund(ctx context.Context, paymentID int, amount float64) (*refund.Response, error) {
-	return g.refund.CreatePartialRefund(ctx, paymentID, amount)
 }
