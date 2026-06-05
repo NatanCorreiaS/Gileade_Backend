@@ -2,6 +2,10 @@
 
 API REST para o sistema de venda de ingressos **Gileade Connect**, integrada com Mercado Pago.
 
+## NOTA PARA A PROFESSORA!
+
+Professora, eu tentei de diversas maneiras fazer o estorno e o cancelamento funcionarem com as credenciais de teste e não obtive êxito algum, então decidi por remover os endpoints de `cancelamento` e `estorno`, infelizmente eu não tive como prever isso até chegar nessa parte, a documentação do mercado pago sobre esses dois é realmente confusa, espero que compreenda esse problema.
+
 ## Tecnologias
 
 - **Golang** 1.26+
