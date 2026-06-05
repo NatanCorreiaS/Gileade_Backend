@@ -54,5 +54,17 @@ func NewRouter(deps AppDeps) *gin.Engine {
 	pagamentos.GET("", controller.NewPagamentoController(deps.DB, deps.MP).ListPayments)
 	pagamentos.POST("/webhook", controller.NewPagamentoController(deps.DB, deps.MP).HandleWebhook)
 
+	adminMiddleware := controller.AdminMiddleware()
+	exportCtrl := controller.NewExportController(deps.DB)
+	admin := api.Group("/admin", authMiddleware, adminMiddleware)
+	{
+		adminExport := admin.Group("/export")
+		adminExport.GET("/usuarios", exportCtrl.ExportPessoas)
+		adminExport.GET("/pagamentos", exportCtrl.ExportPagamentos)
+		adminExport.GET("/tickets", exportCtrl.ExportTickets)
+		adminExport.GET("/tickets-compra", exportCtrl.ExportTicketsCompra)
+		adminExport.GET("/beneficiados", exportCtrl.ExportBeneficiados)
+	}
+
 	return r
 }

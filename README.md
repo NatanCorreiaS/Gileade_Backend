@@ -459,6 +459,84 @@ Lista pagamentos com filtros opcionais.
 
 ---
 
+### Exportacao CSV (Admin)
+
+Endpoints para exportacao de dados em formato CSV. Todos exigem autenticacao de administrador.
+
+> **Requisitos:** `Authorization: Bearer <token>` com cargo `Admin`.
+
+#### `GET /api/v1/admin/export/usuarios` *(admin)*
+
+Exporta todos os usuarios cadastrados em CSV.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Colunas:** `ID`, `Nome`, `TipoUsuario`, `CPF`, `Idade`, `Celular`, `Igreja`, `PapelIgreja`, `EstadoCivil`, `Email`, `Sexo`, `Cidade`, `EstadoUF`, `Escolaridade`, `DataCriacao`, `DataAtualizacao`
+
+---
+
+#### `GET /api/v1/admin/export/pagamentos` *(admin)*
+
+Exporta todos os pagamentos realizados em CSV, incluindo dados da compra associada.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Colunas:** `ID`, `IDTransacao`, `Valor`, `Metodo`, `DataPagamento`, `TicketCompraID`, `UsuarioID`, `TicketID`, `Status`
+
+---
+
+#### `GET /api/v1/admin/export/tickets` *(admin)*
+
+Exporta todos os tickets cadastrados em CSV.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Colunas:** `ID`, `Tipo`, `Nome`, `Descricao`, `Preco`, `QuantidadeDisponivel`, `DataEvento`, `DataCriacao`, `DataAtualizacao`
+
+---
+
+#### `GET /api/v1/admin/export/tickets-compra` *(admin)*
+
+Exporta todas as compras de tickets em CSV, incluindo nome e CPF do comprador.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Colunas:** `ID`, `UsuarioID`, `UsuarioNome`, `UsuarioCPF`, `Status`, `PreferenceID`, `TicketID`, `TicketNome`, `Quantidade`, `DataCriacao`, `DataAtualizacao`
+
+---
+
+#### `GET /api/v1/admin/export/beneficiados` *(admin)*
+
+Exporta todos os beneficiados cadastrados em CSV.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Colunas:** `ID`, `Nome`, `CPF`, `Idade`, `Celular`, `Igreja`, `PapelIgreja`, `EstadoCivil`, `Email`, `Sexo`, `Cidade`, `EstadoUF`, `Escolaridade`, `DataCriacao`, `DataAtualizacao`
+
+**Erros comuns a todas as rotas de exportacao:**
+| Status | Mensagem |
+|---|---|
+| `401` | `token de autorizacao ausente` / `token invalido` |
+| `403` | `acesso restrito a administradores` |
+| `500` | `falha ao consultar ...` |
+
+---
+
 ## Integracao com Flutter
 
 ### Fluxo de autenticacao
