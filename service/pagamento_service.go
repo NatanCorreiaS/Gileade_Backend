@@ -23,10 +23,15 @@ type CheckoutRequest struct {
 	UsuarioID    uint64
 	TicketID     uint64
 	Quantidade   uint64
-	SuccessURL   string
-	FailureURL   string
-	PendingURL   string
+	BackURLs     *BackURLs
+	AutoReturn   string
 	Beneficiados []BeneficiadoInput
+}
+
+type BackURLs struct {
+	Success string
+	Failure string
+	Pending string
 }
 
 type CheckoutResponse struct {
@@ -196,16 +201,16 @@ func (s *PagamentoService) CriarCheckout(ctx context.Context, req CheckoutReques
 		},
 	}
 
-	if req.SuccessURL != "" || req.FailureURL != "" || req.PendingURL != "" {
+	if req.BackURLs != nil {
 		prefReq.BackURLs = &preference.BackURLsRequest{
-			Success: req.SuccessURL,
-			Failure: req.FailureURL,
-			Pending: req.PendingURL,
+			Success: req.BackURLs.Success,
+			Failure: req.BackURLs.Failure,
+			Pending: req.BackURLs.Pending,
 		}
 	}
 
-	if req.SuccessURL != "" {
-		prefReq.AutoReturn = "approved"
+	if req.AutoReturn != "" {
+		prefReq.AutoReturn = req.AutoReturn
 	}
 
 	notificationURL := os.Getenv("MERCADO_PAGO_NOTIFICATION_URL")

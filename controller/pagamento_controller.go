@@ -35,10 +35,15 @@ type CheckoutRequest struct {
 	UsuarioID    uint64               `json:"usuario_id" binding:"required"`
 	TicketID     uint64               `json:"ticket_id" binding:"required"`
 	Quantidade   uint64               `json:"quantidade"`
-	SuccessURL   string               `json:"success_url"`
-	FailureURL   string               `json:"failure_url"`
-	PendingURL   string               `json:"pending_url"`
+	BackURLs     *BackURLsRequest     `json:"back_urls"`
+	AutoReturn   string               `json:"auto_return"`
 	Beneficiados []BeneficiadoRequest `json:"beneficiados"`
+}
+
+type BackURLsRequest struct {
+	Success string `json:"success"`
+	Failure string `json:"failure"`
+	Pending string `json:"pending"`
 }
 
 type BeneficiadoRequest struct {
@@ -104,9 +109,8 @@ func (c *PagamentoController) CreateCheckout(ctx *gin.Context) {
 		UsuarioID:    req.UsuarioID,
 		TicketID:     req.TicketID,
 		Quantidade:   req.Quantidade,
-		SuccessURL:   req.SuccessURL,
-		FailureURL:   req.FailureURL,
-		PendingURL:   req.PendingURL,
+		BackURLs:     toBackURLs(req.BackURLs),
+		AutoReturn:   req.AutoReturn,
 		Beneficiados: toBeneficiadosInput(req.Beneficiados),
 	})
 	if err != nil {
@@ -327,6 +331,17 @@ func parseUsuarioIDs(val string) ([]uint64, error) {
 		ids = append(ids, id)
 	}
 	return ids, nil
+}
+
+func toBackURLs(b *BackURLsRequest) *service.BackURLs {
+	if b == nil {
+		return nil
+	}
+	return &service.BackURLs{
+		Success: b.Success,
+		Failure: b.Failure,
+		Pending: b.Pending,
+	}
 }
 
 func toBeneficiadosInput(reqs []BeneficiadoRequest) []service.BeneficiadoInput {

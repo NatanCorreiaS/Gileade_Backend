@@ -410,9 +410,12 @@ Authorization: Bearer <token>
       "escolaridade": "Ensino Superior Completo"
     }
   ],
-  "success_url": "https://seu-site.com/sucesso",
-  "failure_url": "https://seu-site.com/erro",
-  "pending_url": "https://seu-site.com/pendente"
+  "back_urls": {
+    "success": "tuapp://success",
+    "failure": "tuapp://failure",
+    "pending": "tuapp://pending"
+  },
+  "auto_return": "approved"
 }
 ```
 
