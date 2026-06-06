@@ -2,6 +2,192 @@
 
 API REST para o sistema de venda de ingressos **Gileade Connect**, integrada com Mercado Pago.
 
+## Passo a Passo para Testar os Endpoints
+
+> **URL base de producao:** `https://gileadebackend-production.up.railway.app`
+
+Use os comandos abaixo no terminal (curl) para testar a API passo a passo.
+
+---
+
+### 1. Testar um endpoint publico (GET)
+
+```bash
+# Listar tickets disponiveis (rota publica, sem autenticacao)
+curl -s https://gileadebackend-production.up.railway.app/api/v1/tickets | jq
+```
+
+**Esperado:** JSON com a lista de tickets (pode estar vazia `[]` se nenhum ticket foi cadastrado).
+
+---
+
+### 2. Criar um usuario (POST publico)
+
+```bash
+curl -s -X POST https://gileadebackend-production.up.railway.app/api/v1/pessoas \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nome": "Teste Prof",
+    "senha": "123456",
+    "cpf": "11122233344",
+    "idade": 25,
+    "celular": "+55 11 98888-0001",
+    "igreja": "Igreja Teste",
+    "papel_igreja": "Membro",
+    "estado_civil": "Solteiro(a)",
+    "email": "teste@exemplo.com",
+    "sexo": "Masculino",
+    "cidade": "Sao Paulo",
+    "estado_uf": "SP",
+    "escolaridade": "Ensino Superior Completo"
+  }' | jq
+```
+
+**Esperado:** `201 Created` com os dados do usuario. Se o CPF ja existir, retorna `409`.
+
+---
+
+### 3. Fazer login e obter token JWT
+
+```bash
+# Login com o usuario criado
+curl -s -X POST https://gileadebackend-production.up.railway.app/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"cpf": "11122233344", "senha": "123456"}' | jq
+```
+
+**Esperado:** `200 OK` com `token` e dados do `usuario`.
+
+Guarde o token em uma variavel:
+
+```bash
+TOKEN="eyJhbGciOiJIUzI1NiIs..."   # cole o token recebido aqui
+```
+
+---
+
+### 4. Criar um ticket (POST autenticado)
+
+```bash
+curl -s -X POST https://gileadebackend-production.up.railway.app/api/v1/tickets \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "tipo": "Individual",
+    "nome": "Ingresso VIP",
+    "descricao": "Entrada premium",
+    "preco": "150.00",
+    "quantidade_disponivel": 50,
+    "data_evento": "2026-12-15"
+  }' | jq
+```
+
+**Esperado:** `201 Created` com os dados do ticket. Anote o `id` do ticket (ex: `1`).
+
+---
+
+### 5. Criar um checkout de pagamento (POST autenticado)
+
+```bash
+curl -s -X POST https://gileadebackend-production.up.railway.app/api/v1/pagamentos/checkout \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "usuario_id": 1,
+    "ticket_id": 1,
+    "quantidade": 1,
+    "beneficiados": [
+      {
+        "nome": "Benef Teste",
+        "cpf": "99988877766",
+        "idade": 30,
+        "celular": "+55 11 97777-0002",
+        "igreja": "Igreja Teste",
+        "papel_igreja": "Visitante",
+        "estado_civil": "Casado(a)",
+        "email": "benef@exemplo.com",
+        "sexo": "Feminino",
+        "cidade": "Rio de Janeiro",
+        "estado_uf": "RJ",
+        "escolaridade": "Ensino Superior Completo"
+      }
+    ]
+  }' | jq
+```
+
+**Esperado:** JSON com `preference_id`, `init_point` e `ticket_compra_id`. O `init_point` e o link de pagamento do Mercado Pago (modo sandbox).
+
+---
+
+### 6. Testar rotas de leitura (GET)
+
+```bash
+# Listar usuarios (paginado)
+curl -s "https://gileadebackend-production.up.railway.app/api/v1/pessoas?limit=10&offset=0" | jq
+
+# Buscar usuario por ID
+curl -s https://gileadebackend-production.up.railway.app/api/v1/pessoas/1 | jq
+
+# Listar tickets
+curl -s "https://gileadebackend-production.up.railway.app/api/v1/tickets?limit=10&offset=0" | jq
+
+# Buscar ticket por ID
+curl -s https://gileadebackend-production.up.railway.app/api/v1/tickets/1 | jq
+
+# Buscar compra por ID
+curl -s https://gileadebackend-production.up.railway.app/api/v1/tickets-compra/1 | jq
+
+# Listar compras de um usuario
+curl -s "https://gileadebackend-production.up.railway.app/api/v1/usuarios/1/tickets-compra" | jq
+
+# Listar pagamentos de um usuario
+curl -s "https://gileadebackend-production.up.railway.app/api/v1/pagamentos?usuario_id=1" | jq
+```
+
+---
+
+### 7. Atualizar dados do usuario (PUT autenticado)
+
+```bash
+curl -s -X PUT https://gileadebackend-production.up.railway.app/api/v1/pessoas/1 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $TOKEN" \
+  -d '{
+    "nome": "Teste Atualizado",
+    "celular": "+55 11 96666-9999"
+  }' | jq
+```
+
+**Esperado:** `200 OK` com os dados atualizados.
+
+---
+
+### 8. Logout (invalidar token)
+
+```bash
+curl -s -X POST https://gileadebackend-production.up.railway.app/api/v1/auth/logout \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+**Esperado:** `{"mensagem": "logout realizado"}`. Apos o logout, o token nao pode mais ser usado.
+
+---
+
+### Resumo do Fluxo
+
+```
+1. GET  /tickets              → listar tickets (publico)
+2. POST /pessoas              → cadastrar usuario (publico)
+3. POST /auth/login           → obter token JWT
+4. POST /tickets              → criar ingresso (autenticado)
+5. POST /pagamentos/checkout  → gerar link de pagamento (autenticado)
+6. GET  /pessoas, /tickets... → consultar dados (publico)
+7. PUT  /pessoas/:id          → atualizar cadastro (autenticado)
+8. POST /auth/logout          → invalidar token
+```
+
+---
+
 ## NOTA PARA A PROFESSORA!
 
 Professora, eu tentei de diversas maneiras fazer o estorno e o cancelamento funcionarem com as credenciais de teste e não obtive êxito algum, então decidi por remover os endpoints de `cancelamento` e `estorno`, infelizmente eu não tive como prever isso até chegar nessa parte, a documentação do mercado pago sobre esses dois é realmente confusa, espero que compreenda esse problema.
